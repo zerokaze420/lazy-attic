@@ -7,7 +7,11 @@ mod v1;
 use std::env;
 use std::path::PathBuf;
 
-use axum::{response::Html, routing::{get, post}, Router};
+use axum::{
+    response::Html,
+    routing::{get, post},
+    Router,
+};
 use tower_http::services::{ServeDir, ServeFile};
 
 async fn placeholder() -> Html<&'static str> {
@@ -28,6 +32,8 @@ pub(crate) fn get_router() -> Router {
     if let Some(web_dir) = web_dir() {
         router
             .route_service("/", ServeFile::new(web_dir.join("index.html")))
+            .route_service("/guide", ServeFile::new(web_dir.join("guide/index.html")))
+            .route_service("/guide/", ServeFile::new(web_dir.join("guide/index.html")))
             .nest_service("/_app", ServeDir::new(web_dir.join("_app")))
             .nest_service("/favicon.ico", ServeFile::new(web_dir.join("favicon.ico")))
     } else {

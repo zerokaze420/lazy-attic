@@ -59,7 +59,9 @@ pub(crate) struct AdminTokenResponse {
     expires_at: String,
 }
 
-pub(crate) async fn summary(Extension(state): Extension<State>) -> ServerResult<Json<ConsoleSummary>> {
+pub(crate) async fn summary(
+    Extension(state): Extension<State>,
+) -> ServerResult<Json<ConsoleSummary>> {
     let database = state.database().await?;
 
     let caches = Cache::find()
@@ -110,14 +112,35 @@ pub(crate) async fn summary(Extension(state): Extension<State>) -> ServerResult<
         storage: storage_summary(&state.config.storage),
         counts,
         caches: cache_summaries,
-        admin_token: build_admin_token(&state)?,
+        admin_token: current_admin_token(&state).await?,
     }))
 }
 
 pub(crate) async fn admin_token(
     Extension(state): Extension<State>,
 ) -> ServerResult<Json<AdminTokenResponse>> {
-    Ok(Json(build_admin_token(&state)?))
+    Ok(Json(regenerate_admin_token(&state).await?))
+}
+
+async fn current_admin_token(state: &State) -> ServerResult<AdminTokenResponse> {
+    let mut admin_token = state.console_admin_token.lock().await;
+    if let Some((token, expires_at)) = admin_token.as_ref() {
+        return Ok(AdminTokenResponse {
+            token: token.clone(),
+            expires_at: expires_at.clone(),
+        });
+    }
+
+    let token = build_admin_token(state)?;
+    *admin_token = Some((token.token.clone(), token.expires_at.clone()));
+    Ok(token)
+}
+
+async fn regenerate_admin_token(state: &State) -> ServerResult<AdminTokenResponse> {
+    let token = build_admin_token(state)?;
+    let mut admin_token = state.console_admin_token.lock().await;
+    *admin_token = Some((token.token.clone(), token.expires_at.clone()));
+    Ok(token)
 }
 
 fn build_admin_token(state: &State) -> ServerResult<AdminTokenResponse> {

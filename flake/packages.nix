@@ -84,7 +84,7 @@ in
 
             outputHashAlgo = "sha256";
             outputHashMode = "recursive";
-            outputHash = "sha256-/l6mAtzVCIVxc92SWof1U+v+3jsM0Ib9XX7gU3OFdA4=";
+            outputHash = "sha256-VpH1iVhB/jNJKNapVkaRTqKP+5O+GkBHaFJFvqsXYXM=";
 
             dontConfigure = true;
             dontBuild = true;

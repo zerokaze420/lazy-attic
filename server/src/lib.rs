@@ -40,7 +40,7 @@ use axum::{
 };
 use sea_orm::{query::Statement, ConnectionTrait, Database, DatabaseConnection};
 use tokio::net::TcpListener;
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 use tokio::time;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::trace::TraceLayer;
@@ -67,6 +67,9 @@ pub struct StateInner {
 
     /// Handle to the storage backend.
     storage: OnceCell<Arc<Box<dyn StorageBackend>>>,
+
+    /// Cached console admin token shown by the LazyCat web console.
+    console_admin_token: Mutex<Option<(String, String)>>,
 }
 
 /// Request state.
@@ -100,6 +103,7 @@ impl StateInner {
             config,
             database: OnceCell::new(),
             storage: OnceCell::new(),
+            console_admin_token: Mutex::new(None),
         })
     }
 
