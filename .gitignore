@@ -2,5 +2,10 @@
 
 /target
 result
+build/
+.lzc-cli-cache/
+web/node_modules/
+web/.svelte-kit/
+web/build/
 
 fly.toml

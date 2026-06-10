@@ -133,7 +133,9 @@ let
 
     # We don't pull in the common cargoArtifacts because the feature flags
     # and LTO configs are different
-    inherit src version nativeBuildInputs buildInputs;
+    inherit src version;
+    nativeBuildInputs = [];
+    buildInputs = [];
 
     # See comment in `attic-tests`
     doCheck = false;

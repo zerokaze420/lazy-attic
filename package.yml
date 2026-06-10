@@ -1,0 +1,19 @@
+package: cloud.lazycat.app.attic
+version: 0.1.0
+name: Attic
+description: Nix binary cache server with a lightweight web console.
+author: Attic Maintainers
+license: Apache-2.0
+homepage: https://github.com/zhaofengli/attic
+min_os_version: 1.5.0
+locales:
+  zh-CN:
+    name: Attic
+    description: 带轻量 Web 控制台的 Nix 二进制缓存服务器。
+  en-US:
+    name: Attic
+    description: Nix binary cache server with a lightweight web console.
+permissions:
+  required:
+    - net
+  optional: []

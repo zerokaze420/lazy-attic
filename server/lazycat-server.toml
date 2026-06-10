@@ -1,0 +1,27 @@
+listen = "0.0.0.0:8080"
+allowed-hosts = []
+soft-delete-caches = false
+require-proof-of-possession = true
+
+[database]
+url = "sqlite:///lzcapp/var/attic/server.db?mode=rwc"
+heartbeat = false
+
+[storage]
+type = "local"
+path = "/lzcapp/var/attic/storage"
+
+[chunking]
+nar-size-threshold = 65536
+min-size = 16384
+avg-size = 65536
+max-size = 262144
+
+[compression]
+type = "zstd"
+
+[garbage-collection]
+interval = "12 hours"
+
+[jwt.signing]
+token-hs256-secret-base64 = "YXR0aWMtbGF6eWNhdC1kZWZhdWx0LXNlY3JldA=="

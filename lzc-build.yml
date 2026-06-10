@@ -1,0 +1,18 @@
+buildscript: |
+  set -e
+  rootfs="$(nix build .#attic-lazycat-rootfs --no-link --print-out-paths)"
+  if [ -e result ]; then
+    chmod -R u+w result
+    rm -rf result
+  fi
+  cp -R "$rootfs" result
+  mkdir -p build
+
+manifest: ./lzc-manifest.yml
+pkgout: ./build
+images:
+  attic:
+    builder: remote
+    dockerfile: ./Dockerfile.lzc
+    context: .
+    upstream-match: registry.lazycat.cloud

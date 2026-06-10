@@ -76,6 +76,58 @@ in
         packages = {
           default = self'.packages.attic;
 
+          attic-web-deps = pkgs.stdenvNoCC.mkDerivation {
+            pname = "attic-web-deps";
+            version = "0.1.0";
+            src = ../web;
+            nativeBuildInputs = [ pkgs.bun ];
+
+            outputHashAlgo = "sha256";
+            outputHashMode = "recursive";
+            outputHash = "sha256-/l6mAtzVCIVxc92SWof1U+v+3jsM0Ib9XX7gU3OFdA4=";
+
+            dontConfigure = true;
+            dontBuild = true;
+            dontFixup = true;
+
+            installPhase = ''
+              runHook preInstall
+              export HOME="$TMPDIR"
+              export BUN_INSTALL_CACHE_DIR="$TMPDIR/bun-cache"
+              bun install --frozen-lockfile --no-progress
+              mkdir -p $out
+              cp -R node_modules $out/
+              runHook postInstall
+            '';
+          };
+
+          attic-web = pkgs.stdenvNoCC.mkDerivation {
+            pname = "attic-web";
+            version = "0.1.0";
+            src = ../web;
+            nativeBuildInputs = [ pkgs.bun ];
+
+            dontConfigure = true;
+            dontFixup = true;
+
+            buildPhase = ''
+              runHook preBuild
+              cp -R ${self'.packages.attic-web-deps}/node_modules ./node_modules
+              chmod -R u+w ./node_modules
+              export HOME="$TMPDIR"
+              export BUN_INSTALL_CACHE_DIR="$TMPDIR/bun-cache"
+              bun ./node_modules/vite/bin/vite.js build
+              runHook postBuild
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out
+              cp -R build/. $out/
+              runHook postInstall
+            '';
+          };
+
           inherit (cranePkgs)
             attic
             attic-client
@@ -97,7 +149,10 @@ in
       }
 
       (lib.mkIf pkgs.stdenv.isLinux {
-        packages = {
+        packages = let
+          lazycatConfig = pkgs.writeText "attic-lazycat-server.toml" (builtins.readFile ../server/lazycat-server.toml);
+          version = "0.1.0";
+        in {
           attic-server-image = pkgs.dockerTools.buildImage {
             name = "attic-server";
             tag = "main";
@@ -116,6 +171,89 @@ in
                 "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
               ];
             };
+          };
+
+          attic-lazycat-rootfs = let
+            runtimeClosure = pkgs.closureInfo {
+              rootPaths = [
+                self'.packages.attic-server
+                pkgs.busybox
+                pkgs.cacert
+                pkgs.dockerTools.fakeNss
+              ];
+            };
+          in pkgs.runCommand "attic-lazycat-rootfs-${version}" {} ''
+            mkdir -p $out/bin $out/app/web $out/etc/attic $out/etc/ssl/certs $out/lzcapp/var/attic/storage
+            xargs -I path cp -a --parents path $out < ${runtimeClosure}/store-paths
+            ln -s ${self'.packages.attic-server}/bin/atticd $out/bin/atticd
+            ln -s ${self'.packages.attic-server}/bin/atticadm $out/bin/atticadm
+            ln -s ${pkgs.busybox}/bin/busybox $out/bin/busybox
+            ln -s ${pkgs.busybox}/bin/sh $out/bin/sh
+            ln -s ${pkgs.busybox}/bin/mkdir $out/bin/mkdir
+            cp -R ${self'.packages.attic-web}/. $out/app/web/
+            cp ${lazycatConfig} $out/etc/attic/server.toml
+            cp ${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt $out/etc/ssl/certs/ca-bundle.crt
+          '';
+
+          attic-lazycat-image = pkgs.dockerTools.buildImage {
+            name = "attic-lazycat";
+            tag = "${version}-nix";
+            copyToRoot = null;
+            extraCommands = ''
+              cp -a ${self'.packages.attic-lazycat-rootfs}/. .
+            '';
+            config = {
+              Cmd = [
+                "/bin/atticd"
+                "-f"
+                "/etc/attic/server.toml"
+              ];
+              Env = [
+                "ATTIC_WEB_DIR=/app/web"
+                "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+              ];
+              ExposedPorts = {
+                "8080/tcp" = {};
+              };
+            };
+          };
+
+          lpk = pkgs.stdenvNoCC.mkDerivation {
+            pname = "cloud.lazycat.app.attic";
+            inherit version;
+            src = lib.cleanSourceWith {
+              src = ./..;
+              filter = name: type: let
+                base = baseNameOf name;
+              in !(type == "directory" && builtins.elem base [
+                ".git"
+                "target"
+                "node_modules"
+                "result"
+                "build"
+              ]);
+            };
+
+            nativeBuildInputs = [
+              pkgs.python3
+            ];
+
+            dontConfigure = true;
+            dontBuild = true;
+            dontFixup = true;
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out
+              lpk="$out/cloud.lazycat.app.attic-v${version}-nix.lpk"
+              python3 scripts/docker_archive_to_lpk.py \
+                --src-root . \
+                --docker-archive ${self'.packages.attic-lazycat-image} \
+                --image-ref attic \
+                --output "$lpk"
+              test -s "$lpk"
+              runHook postInstall
+            '';
           };
         };
       })

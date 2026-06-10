@@ -21,7 +21,7 @@ pub struct LocalBackend {
 #[derive(Debug, Clone, Deserialize)]
 pub struct LocalStorageConfig {
     /// The directory to store all files under.
-    path: PathBuf,
+    pub(crate) path: PathBuf,
 }
 
 /// Reference to a file in local storage.

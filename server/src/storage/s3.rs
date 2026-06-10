@@ -36,10 +36,10 @@ pub struct S3Backend {
 #[derive(Debug, Clone, Deserialize)]
 pub struct S3StorageConfig {
     /// The AWS region.
-    region: String,
+    pub(crate) region: String,
 
     /// The name of the bucket.
-    bucket: String,
+    pub(crate) bucket: String,
 
     /// Custom S3 endpoint.
     ///

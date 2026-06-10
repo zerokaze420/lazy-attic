@@ -1,0 +1,10 @@
+application:
+  subdomain: attic
+  routes:
+    - /=http://attic.cloud.lazycat.app.attic.lzcapp:8080
+
+services:
+  attic:
+    image: embed:attic
+    binds:
+      - /lzcapp/var/attic:/lzcapp/var/attic
