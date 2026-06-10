@@ -1,12 +1,12 @@
 buildscript: |
   set -e
   rootfs="$(nix build .#attic-lazycat-rootfs --no-link --print-out-paths)"
-  if [ -e result ]; then
-    chmod -R u+w result
-    rm -rf result
-  fi
-  cp -R "$rootfs" result
   mkdir -p build
+  if [ -e build/rootfs ]; then
+    chmod -R u+w build/rootfs
+    rm -rf build/rootfs
+  fi
+  cp -R "$rootfs" build/rootfs
 
 manifest: ./lzc-manifest.yml
 pkgout: ./build

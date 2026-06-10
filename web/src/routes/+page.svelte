@@ -44,17 +44,10 @@
     minute: '2-digit'
   });
 
-  onMount(async () => {
+  onMount(() => {
     origin = location.origin;
     token = localStorage.getItem('attic.console.token') ?? '';
-    await refresh();
-
-    const { animate, stagger } = await import('motion');
-    animate(
-      '.motion-card',
-      { opacity: [0, 1], transform: ['translateY(14px)', 'translateY(0)'] },
-      { duration: 0.45, delay: stagger(0.04), easing: 'ease-out' }
-    );
+    refresh();
   });
 
   async function refresh() {
@@ -175,6 +168,15 @@
   $: pushCommand = `attic push local:${exampleCache} /nix/store/<path>`;
   $: substituterCommand = `substituters = ${origin}/${publicCache}`;
   $: trustedKeysCommand = `trusted-public-keys = ${publicKey}`;
+  $: clientCommands = [
+    { value: loginCommand, label: '登录命令' },
+    { value: useCommand, label: '启用命令' },
+    { value: pushCommand, label: '推送命令' }
+  ];
+  $: nixCommands = [
+    { value: substituterCommand, label: 'Substituter' },
+    { value: trustedKeysCommand, label: 'Public key' }
+  ];
 </script>
 
 <svelte:head>
@@ -373,9 +375,19 @@
         </div>
         <Terminal size={20} />
       </div>
-      <CodeLine value={loginCommand} label="登录命令" />
-      <CodeLine value={useCommand} label="启用命令" />
-      <CodeLine value={pushCommand} label="推送命令" />
+      {#each clientCommands as command}
+        <div class="code-line">
+          <code>{command.value}</code>
+          <button
+            class="icon-button"
+            type="button"
+            title={`复制${command.label}`}
+            on:click={() => copyText(command.value, command.label)}
+          >
+            <Clipboard size={15} />
+          </button>
+        </div>
+      {/each}
     </article>
 
     <article class="panel command-card motion-card">
@@ -386,8 +398,19 @@
         </div>
         <ShieldCheck size={20} />
       </div>
-      <CodeLine value={substituterCommand} label="Substituter" />
-      <CodeLine value={trustedKeysCommand} label="Public key" />
+      {#each nixCommands as command}
+        <div class="code-line">
+          <code>{command.value}</code>
+          <button
+            class="icon-button"
+            type="button"
+            title={`复制${command.label}`}
+            on:click={() => copyText(command.value, command.label)}
+          >
+            <Clipboard size={15} />
+          </button>
+        </div>
+      {/each}
     </article>
   </section>
 
@@ -431,15 +454,6 @@
   {/if}
 </main>
 
-{#snippet CodeLine({ value, label })}
-  <div class="code-line">
-    <code>{value}</code>
-    <button class="icon-button" type="button" title={`复制${label}`} on:click={() => copyText(value, label)}>
-      <Clipboard size={15} />
-    </button>
-  </div>
-{/snippet}
-
 <style>
   :global(*) {
     box-sizing: border-box;
@@ -465,6 +479,19 @@
 
   .motion-card {
     opacity: 1;
+    animation: card-in 420ms ease-out both;
+  }
+
+  .motion-card:nth-child(2) {
+    animation-delay: 35ms;
+  }
+
+  .motion-card:nth-child(3) {
+    animation-delay: 70ms;
+  }
+
+  .motion-card:nth-child(4) {
+    animation-delay: 105ms;
   }
 
   .topbar,
@@ -936,6 +963,17 @@
   @keyframes spin {
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 

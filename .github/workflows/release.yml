@@ -1,4 +1,4 @@
-name: Build and Release LPK
+name: Build LazyCat LPK
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build LPK
+    name: Build and publish LPK
     runs-on: ubuntu-24.04
 
     steps:
@@ -27,13 +27,16 @@ jobs:
             experimental-features = nix-command flakes
             accept-flake-config = true
 
-      - name: Build LPK
+      - name: Build LazyCat LPK
         run: nix build .#lpk --print-build-logs
 
-      - name: Collect artifact
+      - name: Collect single LPK
         run: |
+          set -euo pipefail
           mkdir -p dist
           cp result/*.lpk dist/
+          count="$(find dist -maxdepth 1 -type f -name '*.lpk' | wc -l)"
+          test "$count" = "1"
           ls -lh dist
 
       - name: Upload workflow artifact
@@ -43,8 +46,33 @@ jobs:
           path: dist/*.lpk
           if-no-files-found: error
 
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.lpk
+      - name: Select release tag
+        id: release
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="latest"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Publish LPK to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          lpk="$(find dist -maxdepth 1 -type f -name '*.lpk' | head -n 1)"
+          if [ "$RELEASE_TAG" = "latest" ]; then
+            git tag -f latest "$GITHUB_SHA"
+            git push origin refs/tags/latest --force
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$lpk" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$lpk" \
+              --target "$GITHUB_SHA" \
+              --title "Lazy Attic LPK ${RELEASE_TAG}" \
+              --notes "Automated LazyCat LPK build for ${GITHUB_SHA}."
+          fi

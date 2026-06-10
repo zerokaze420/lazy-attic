@@ -22,18 +22,25 @@
 let
   version = "0.1.0";
 
-  ignoredPaths = [
-    ".ci"
-    ".github"
-    "book"
-    "flake"
-    "integration-tests"
-    "nixos"
-    "target"
-  ];
-
   src = lib.cleanSourceWith {
-    filter = name: type: !(type == "directory" && builtins.elem (baseNameOf name) ignoredPaths);
+    filter = name: type: let
+      rel = lib.removePrefix ((toString ./.) + "/") (toString name);
+      first = builtins.head (lib.splitString "/" rel);
+      allowedRoots = [
+        "attic"
+        "client"
+        "server"
+        "token"
+      ];
+      allowedFiles = [
+        "Cargo.lock"
+        "Cargo.toml"
+        "LICENSE"
+        "README.md"
+      ];
+    in
+      builtins.elem first allowedRoots
+      || builtins.elem rel allowedFiles;
     src = lib.cleanSource ./.;
   };
 

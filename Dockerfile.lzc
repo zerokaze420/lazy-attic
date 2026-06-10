@@ -1,5 +1,5 @@
 FROM scratch
-COPY result /
+COPY build/rootfs /
 ENV ATTIC_WEB_DIR=/app/web
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
 CMD ["/bin/busybox", "sh", "-c", "/bin/busybox mkdir -p /lzcapp/var/attic/storage && exec /bin/atticd -f /etc/attic/server.toml"]
