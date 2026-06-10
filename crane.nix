@@ -36,7 +36,6 @@ let
         "Cargo.lock"
         "Cargo.toml"
         "LICENSE"
-        "README.md"
       ];
     in
       builtins.elem first allowedRoots

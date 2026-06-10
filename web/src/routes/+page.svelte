@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import {
     AlertCircle,
+    BookOpen,
     Box,
     CheckCircle2,
     Clipboard,
@@ -198,6 +199,10 @@
         <CheckCircle2 size={16} />
         {summary?.status === 'online' ? '服务在线' : (loading ? '加载中' : '未知状态')}
       </span>
+      <a class="nav-link" href="/guide">
+        <BookOpen size={16} />
+        <span>使用教程</span>
+      </a>
       <button class="secondary" type="button" on:click={refresh} disabled={loading}>
         <span class:spin={loading}><RefreshCw size={16} /></span>
         <span>{loading ? '刷新中' : '刷新'}</span>
@@ -414,38 +419,16 @@
     </article>
   </section>
 
-  <section class="guide panel motion-card">
+  <section class="next-step panel motion-card">
     <div class="panel-head">
       <div>
-        <h2>快速使用指南</h2>
-        <p>按顺序完成初始化、推送和拉取。</p>
+        <h2>完整使用教程</h2>
+        <p>初始化缓存、客户端登录、NixOS 配置和常见错误排查已经移到独立页面。</p>
       </div>
-    </div>
-    <div class="guide-grid">
-      <article>
-        <strong>1. 确认管理员 Token</strong>
-        <p>页面加载时会自动签发并显示 Token，用于创建缓存和客户端登录。</p>
-      </article>
-      <article>
-        <strong>2. 创建缓存</strong>
-        <p>建议先创建 <code>main</code>。创建后列表会显示 public key。</p>
-      </article>
-      <article>
-        <strong>3. 登录客户端</strong>
-        <p>复制客户端命令中的登录命令，把 <code>&lt;token&gt;</code> 替换成页面 Token。</p>
-      </article>
-      <article>
-        <strong>4. 推送路径</strong>
-        <p>运行 <code>attic push</code> 推送构建结果或任意 store path。</p>
-      </article>
-      <article>
-        <strong>5. 配置 Nix</strong>
-        <p>复制 Nix 配置里的 substituter 和 trusted-public-keys。</p>
-      </article>
-      <article>
-        <strong>6. 排查问题</strong>
-        <p>如果推送失败，先检查缓存名、Token 和 LazyCat 域名访问。</p>
-      </article>
+      <a class="nav-link primary-link" href="/guide">
+        <BookOpen size={16} />
+        <span>打开教程</span>
+      </a>
     </div>
   </section>
 
@@ -500,6 +483,7 @@
   button,
   .status-pill,
   .key-cell,
+  .nav-link,
   a {
     display: flex;
     align-items: center;
@@ -596,6 +580,44 @@
     border-color: #aebacf;
     background: #f7f9fc;
     box-shadow: 0 8px 18px rgba(15, 34, 58, 0.08);
+  }
+
+  .nav-link {
+    justify-content: center;
+    gap: 8px;
+    min-height: 38px;
+    border: 1px solid #cad2df;
+    border-radius: 6px;
+    padding: 0 13px;
+    background: #fff;
+    color: #263548;
+    font-size: 0.95rem;
+    font-weight: 750;
+    text-decoration: none;
+    transition:
+      transform 140ms ease,
+      background 140ms ease,
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .nav-link:hover {
+    border-color: #aebacf;
+    background: #f7f9fc;
+    box-shadow: 0 8px 18px rgba(15, 34, 58, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .primary-link {
+    border-color: #175cd3;
+    background: #175cd3;
+    color: #fff;
+  }
+
+  .primary-link:hover {
+    border-color: #0f4eb8;
+    background: #0f4eb8;
+    box-shadow: 0 10px 22px rgba(23, 92, 211, 0.18);
   }
 
   .icon-button {
@@ -781,8 +803,7 @@
   }
 
   .key-cell code,
-  .code-line code,
-  .guide code {
+  .code-line code {
     overflow-x: auto;
     border-radius: 6px;
     background: #f3f6fa;
@@ -903,46 +924,8 @@
     padding: 10px 11px;
   }
 
-  .guide {
+  .next-step {
     margin-top: 16px;
-  }
-
-  .guide-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .guide article {
-    display: grid;
-    align-content: start;
-    gap: 9px;
-    min-height: 138px;
-    padding: 16px 18px;
-    border-right: 1px solid #edf1f5;
-    border-bottom: 1px solid #edf1f5;
-  }
-
-  .guide article:nth-child(3n) {
-    border-right: 0;
-  }
-
-  .guide article:nth-last-child(-n + 3) {
-    border-bottom: 0;
-  }
-
-  .guide strong {
-    color: #17202a;
-    font-size: 0.96rem;
-  }
-
-  .guide p {
-    color: #526176;
-    font-size: 0.9rem;
-    line-height: 1.55;
-  }
-
-  .guide code {
-    padding: 2px 5px;
   }
 
   .toast {
@@ -980,8 +963,7 @@
   @media (max-width: 980px) {
     .metrics,
     .workspace,
-    .command-grid,
-    .guide-grid {
+    .command-grid {
       grid-template-columns: 1fr;
     }
 
@@ -989,16 +971,6 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .guide article,
-    .guide article:nth-child(3n),
-    .guide article:nth-last-child(-n + 3) {
-      border-right: 0;
-      border-bottom: 1px solid #edf1f5;
-    }
-
-    .guide article:last-child {
-      border-bottom: 0;
-    }
   }
 
   @media (max-width: 600px) {

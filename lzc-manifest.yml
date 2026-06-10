@@ -2,6 +2,8 @@ application:
   subdomain: attic
   routes:
     - /=http://attic.cloud.lazycat.app.attic.lzcapp:8080
+  public_path:
+    - /
 
 services:
   attic:
