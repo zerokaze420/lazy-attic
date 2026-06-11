@@ -27,6 +27,7 @@ pub(crate) fn get_router() -> Router {
         .merge(binary_cache::get_router())
         .merge(v1::get_router())
         .route("/_api/web/summary", get(console::summary))
+        .route("/_api/web/usage", get(console::usage))
         .route("/_api/web/admin-token", post(console::admin_token))
         .route(
             "/_api/web/caches/:cache/objects",

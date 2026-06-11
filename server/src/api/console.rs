@@ -1,5 +1,8 @@
 //! Lightweight web console endpoints.
 
+use std::cmp::Reverse;
+use std::collections::{HashMap, HashSet};
+
 use axum::{
     extract::{Extension, Path, Query},
     Json,
@@ -46,6 +49,59 @@ pub(crate) struct ConsoleCounts {
 }
 
 #[derive(Debug, Serialize)]
+pub(crate) struct ConsoleUsage {
+    totals: ConsoleUsageTotals,
+    cache_usage: Vec<ConsoleCacheUsage>,
+    recent_uploads: Vec<ConsoleObject>,
+    recent_accesses: Vec<ConsoleObject>,
+    systems: Vec<ConsoleUsageBucket>,
+    compressions: Vec<ConsoleUsageBucket>,
+    uploaders: Vec<ConsoleUsageBucket>,
+    health: ConsoleHealth,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ConsoleUsageTotals {
+    nar_size: i64,
+    logical_nar_size: i64,
+    incomplete_objects: u64,
+    never_accessed_objects: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ConsoleCacheUsage {
+    cache: ConsoleCache,
+    nar_size: i64,
+    incomplete_objects: u64,
+    never_accessed_objects: u64,
+    last_upload_at: Option<String>,
+    last_accessed_at: Option<String>,
+    systems: Vec<ConsoleUsageBucket>,
+    compressions: Vec<ConsoleUsageBucket>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct ConsoleUsageBucket {
+    name: String,
+    count: u64,
+    nar_size: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ConsoleHealth {
+    score: u8,
+    issues: Vec<ConsoleHealthIssue>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ConsoleHealthIssue {
+    severity: &'static str,
+    title: String,
+    detail: String,
+    cache: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct ConsoleCache {
     name: String,
     public_key: String,
@@ -87,7 +143,7 @@ pub(crate) struct ConsoleObjectDetail {
     object: ConsoleObject,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct ConsoleObject {
     store_path_hash: String,
     store_path: String,
@@ -104,7 +160,7 @@ pub(crate) struct ConsoleObject {
     nar_url: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct ConsoleNar {
     nar_hash: String,
     nar_size: i64,
@@ -113,6 +169,33 @@ pub(crate) struct ConsoleNar {
     completeness_hint: bool,
     holders_count: i32,
     created_at: String,
+}
+
+#[derive(Debug)]
+struct CacheUsageAcc {
+    cache: ConsoleCache,
+    nar_size: i64,
+    incomplete_objects: u64,
+    never_accessed_objects: u64,
+    last_upload_at: Option<chrono::DateTime<Utc>>,
+    last_accessed_at: Option<chrono::DateTime<Utc>>,
+    systems: HashMap<String, ConsoleUsageBucket>,
+    compressions: HashMap<String, ConsoleUsageBucket>,
+}
+
+impl CacheUsageAcc {
+    fn new(cache: ConsoleCache) -> Self {
+        Self {
+            cache,
+            nar_size: 0,
+            incomplete_objects: 0,
+            never_accessed_objects: 0,
+            last_upload_at: None,
+            last_accessed_at: None,
+            systems: HashMap::new(),
+            compressions: HashMap::new(),
+        }
+    }
 }
 
 pub(crate) async fn summary(
@@ -161,6 +244,203 @@ pub(crate) async fn summary(
         counts,
         caches: cache_summaries,
         admin_token: current_admin_token(&state).await?,
+    }))
+}
+
+pub(crate) async fn usage(
+    Extension(state): Extension<State>,
+    Extension(req_state): Extension<RequestState>,
+) -> ServerResult<Json<ConsoleUsage>> {
+    let database = state.database().await?;
+
+    let caches = Cache::find()
+        .filter(cache::Column::DeletedAt.is_null())
+        .order_by_asc(cache::Column::Name)
+        .all(database)
+        .await
+        .map_err(ServerError::database_error)?;
+
+    let cache_ids = caches.iter().map(|cache| cache.id).collect::<HashSet<_>>();
+    let rows = Object::find()
+        .find_also_related(Nar)
+        .all(database)
+        .await
+        .map_err(ServerError::database_error)?;
+
+    let active_rows = rows
+        .into_iter()
+        .filter_map(|(object, nar)| {
+            if cache_ids.contains(&object.cache_id) {
+                nar.map(|nar| (object, nar))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let mut object_counts = HashMap::<i64, u64>::new();
+    for (object, _) in &active_rows {
+        *object_counts.entry(object.cache_id).or_default() += 1;
+    }
+
+    let mut cache_summaries = HashMap::new();
+    for cache in &caches {
+        cache_summaries.insert(
+            cache.id,
+            console_cache(cache, object_counts.get(&cache.id).copied().unwrap_or(0), &req_state)?,
+        );
+    }
+
+    let mut usage_by_cache = caches
+        .iter()
+        .map(|cache| {
+            (
+                cache.id,
+                CacheUsageAcc::new(cache_summaries[&cache.id].clone()),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let mut systems = HashMap::<String, ConsoleUsageBucket>::new();
+    let mut compressions = HashMap::<String, ConsoleUsageBucket>::new();
+    let mut uploaders = HashMap::<String, ConsoleUsageBucket>::new();
+    let mut unique_nars = HashMap::<i64, i64>::new();
+    let mut recent_uploads = Vec::new();
+    let mut recent_accesses = Vec::new();
+    let mut incomplete_objects = 0;
+    let mut never_accessed_objects = 0;
+    let mut logical_nar_size = 0;
+    let now = Utc::now();
+    let stale_cutoff = now - ChronoDuration::days(30);
+    let mut issues = Vec::new();
+
+    for (object, nar) in active_rows {
+        let cache_summary = match cache_summaries.get(&object.cache_id) {
+            Some(cache) => cache,
+            None => continue,
+        };
+        let nar_size = nar.nar_size.max(0);
+        logical_nar_size += nar_size;
+        unique_nars.entry(nar.id).or_insert(nar_size);
+
+        if !nar.completeness_hint {
+            incomplete_objects += 1;
+        }
+        if object.last_accessed_at.is_none() {
+            never_accessed_objects += 1;
+        }
+
+        add_bucket(
+            &mut systems,
+            object.system.as_deref().unwrap_or("unknown"),
+            nar_size,
+        );
+        add_bucket(&mut compressions, &nar.compression, nar_size);
+        add_bucket(
+            &mut uploaders,
+            object.created_by.as_deref().unwrap_or("unknown"),
+            nar_size,
+        );
+
+        if let Some(acc) = usage_by_cache.get_mut(&object.cache_id) {
+            acc.nar_size += nar_size;
+            if !nar.completeness_hint {
+                acc.incomplete_objects += 1;
+            }
+            if object.last_accessed_at.is_none() {
+                acc.never_accessed_objects += 1;
+            }
+            acc.last_upload_at = Some(acc.last_upload_at.map_or(object.created_at, |current| {
+                current.max(object.created_at)
+            }));
+            if let Some(last_accessed_at) = object.last_accessed_at {
+                acc.last_accessed_at = Some(
+                    acc.last_accessed_at
+                        .map_or(last_accessed_at, |current| current.max(last_accessed_at)),
+                );
+            }
+            add_bucket(
+                &mut acc.systems,
+                object.system.as_deref().unwrap_or("unknown"),
+                nar_size,
+            );
+            add_bucket(&mut acc.compressions, &nar.compression, nar_size);
+        }
+
+        if !nar.completeness_hint {
+            issues.push(ConsoleHealthIssue {
+                severity: "error",
+                title: "存在不完整对象".to_string(),
+                detail: format!("{} 的 NAR 分块可能不完整。", object.store_path),
+                cache: Some(cache_summary.name.clone()),
+            });
+        } else if object.last_accessed_at.is_none() && object.created_at < stale_cutoff {
+            issues.push(ConsoleHealthIssue {
+                severity: "warn",
+                title: "长期未访问对象".to_string(),
+                detail: format!("{} 创建超过 30 天且没有访问记录。", object.store_path),
+                cache: Some(cache_summary.name.clone()),
+            });
+        }
+
+        let console_object = console_object(cache_summary, object, nar);
+        recent_uploads.push(console_object.clone());
+        if console_object.last_accessed_at.is_some() {
+            recent_accesses.push(console_object);
+        }
+    }
+
+    for cache in &caches {
+        if object_counts.get(&cache.id).copied().unwrap_or(0) == 0 {
+            issues.push(ConsoleHealthIssue {
+                severity: "info",
+                title: "空缓存".to_string(),
+                detail: "这个缓存还没有上传任何 store path。".to_string(),
+                cache: Some(cache.name.clone()),
+            });
+        }
+    }
+
+    recent_uploads.sort_by_key(|object| Reverse(object.created_at.clone()));
+    recent_uploads.truncate(8);
+    recent_accesses.sort_by_key(|object| Reverse(object.last_accessed_at.clone()));
+    recent_accesses.truncate(8);
+    issues.truncate(10);
+
+    let score = (100_i32
+        - (incomplete_objects as i32 * 18)
+        - (issues.iter().filter(|issue| issue.severity == "warn").count() as i32 * 4)
+        - (issues.iter().filter(|issue| issue.severity == "info").count() as i32 * 2))
+        .clamp(0, 100) as u8;
+
+    let mut cache_usage = usage_by_cache
+        .into_values()
+        .map(|acc| ConsoleCacheUsage {
+            cache: acc.cache,
+            nar_size: acc.nar_size,
+            incomplete_objects: acc.incomplete_objects,
+            never_accessed_objects: acc.never_accessed_objects,
+            last_upload_at: acc.last_upload_at.map(|value| value.to_rfc3339()),
+            last_accessed_at: acc.last_accessed_at.map(|value| value.to_rfc3339()),
+            systems: sorted_buckets(acc.systems, 5),
+            compressions: sorted_buckets(acc.compressions, 5),
+        })
+        .collect::<Vec<_>>();
+    cache_usage.sort_by_key(|cache| Reverse(cache.nar_size));
+
+    Ok(Json(ConsoleUsage {
+        totals: ConsoleUsageTotals {
+            nar_size: unique_nars.values().sum(),
+            logical_nar_size,
+            incomplete_objects,
+            never_accessed_objects,
+        },
+        cache_usage,
+        recent_uploads,
+        recent_accesses,
+        systems: sorted_buckets(systems, 8),
+        compressions: sorted_buckets(compressions, 8),
+        uploaders: sorted_buckets(uploaders, 8),
+        health: ConsoleHealth { score, issues },
     }))
 }
 
@@ -313,6 +593,28 @@ fn storage_summary(storage: &StorageConfig) -> StorageSummary {
             location: Some(s3.bucket.clone()),
         },
     }
+}
+
+fn add_bucket(buckets: &mut HashMap<String, ConsoleUsageBucket>, name: &str, nar_size: i64) {
+    let bucket = buckets
+        .entry(name.to_string())
+        .or_insert_with(|| ConsoleUsageBucket {
+            name: name.to_string(),
+            count: 0,
+            nar_size: 0,
+        });
+    bucket.count += 1;
+    bucket.nar_size += nar_size;
+}
+
+fn sorted_buckets(
+    buckets: HashMap<String, ConsoleUsageBucket>,
+    limit: usize,
+) -> Vec<ConsoleUsageBucket> {
+    let mut buckets = buckets.into_values().collect::<Vec<_>>();
+    buckets.sort_by_key(|bucket| Reverse((bucket.count, bucket.nar_size)));
+    buckets.truncate(limit);
+    buckets
 }
 
 fn console_cache(

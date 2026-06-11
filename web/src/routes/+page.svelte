@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import {
     AlertCircle,
+    Activity,
+    BarChart3,
     BookOpen,
     Box,
     CheckCircle2,
@@ -13,6 +15,7 @@
     KeyRound,
     Layers3,
     List,
+    PieChart,
     Plus,
     RefreshCw,
     Search,
@@ -30,6 +33,7 @@
   };
 
   let summary = null;
+  let usage = null;
   let loading = true;
   let error = '';
   let token = '';
@@ -44,6 +48,7 @@
   let cacheVisibility = 'all';
   let cacheView = 'cards';
   let commandTab = 'client';
+  let usageTab = 'overview';
 
   const formatter = new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
@@ -73,6 +78,11 @@
         token = summary.admin_token.token;
         adminTokenExpires = summary.admin_token.expires_at;
         localStorage.setItem('attic.console.token', token);
+      }
+
+      const usageResponse = await fetch('/_api/web/usage');
+      if (usageResponse.ok) {
+        usage = await usageResponse.json();
       }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
@@ -177,6 +187,40 @@
     return `${hours || 1} 小时`;
   }
 
+  function formatBytes(value) {
+    if (!Number.isFinite(value)) {
+      return '-';
+    }
+    const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+    let size = Math.max(0, value);
+    let unit = 0;
+    while (size >= 1024 && unit < units.length - 1) {
+      size /= 1024;
+      unit += 1;
+    }
+    return `${size >= 10 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
+  }
+
+  function maxBucketValue(items) {
+    return Math.max(1, ...(items ?? []).map((item) => item.nar_size || item.count || 0));
+  }
+
+  function bucketWidth(item, items) {
+    return `${Math.max(8, ((item.nar_size || item.count || 0) / maxBucketValue(items)) * 100)}%`;
+  }
+
+  function healthLabel(score) {
+    if (score >= 90) return '健康';
+    if (score >= 70) return '需关注';
+    return '异常';
+  }
+
+  function scoreColor(score) {
+    if (score >= 90) return '#247347';
+    if (score >= 70) return '#8a5a18';
+    return '#b42318';
+  }
+
   function joinList(values) {
     return values?.length ? values.join(', ') : '无';
   }
@@ -206,6 +250,10 @@
   $: exampleCache = caches[0]?.name || '<缓存名>';
   $: publicCache = publicCacheModel?.name || exampleCache;
   $: publicKey = publicCacheModel?.public_key || '<缓存公钥>';
+  $: topCacheUsage = usage?.cache_usage?.[0];
+  $: recentActivity = usage?.recent_uploads ?? [];
+  $: healthIssues = usage?.health?.issues ?? [];
+  $: healthScore = usage?.health?.score ?? 0;
   $: apiEndpoint = publicCacheModel?.api_endpoint || `${origin}/`;
   $: substituterEndpoint = publicCacheModel?.substituter_endpoint || `${origin}/${publicCache}`;
   $: loginCommand = `attic login local ${apiEndpoint} <token>`;
@@ -292,7 +340,6 @@
     <div>
       <p class="eyebrow">Workspace</p>
       <h2>缓存工作台</h2>
-      <p>搜索、筛选、复制 endpoint，或者进入详情查看 store path、NAR 与配置。</p>
     </div>
     <div class="quick-actions">
       <button type="button" on:click={() => copyText(substituterEndpoint, 'Substituter')}>
@@ -304,6 +351,133 @@
         <span>Public key</span>
       </button>
     </div>
+  </section>
+
+  <section class="panel usage-panel" aria-label="缓存使用情况">
+    <div class="panel-head compact">
+      <div>
+        <p class="eyebrow">Insights</p>
+        <h2>使用洞察</h2>
+      </div>
+      <div class="segmented">
+        <button class:active={usageTab === 'overview'} class="secondary" type="button" on:click={() => usageTab = 'overview'}>
+          <BarChart3 size={15} />
+          <span>概览</span>
+        </button>
+        <button class:active={usageTab === 'health'} class="secondary" type="button" on:click={() => usageTab = 'health'}>
+          <ShieldCheck size={15} />
+          <span>健康</span>
+        </button>
+        <button class:active={usageTab === 'profile'} class="secondary" type="button" on:click={() => usageTab = 'profile'}>
+          <PieChart size={15} />
+          <span>画像</span>
+        </button>
+        <button class:active={usageTab === 'activity'} class="secondary" type="button" on:click={() => usageTab = 'activity'}>
+          <Activity size={15} />
+          <span>活动</span>
+        </button>
+      </div>
+    </div>
+
+    {#if usageTab === 'overview'}
+      <div class="visual-overview">
+        <div class="score-ring" style={`--score: ${healthScore}; --score-color: ${scoreColor(healthScore)}`}>
+          <strong>{usage ? healthScore : '-'}</strong>
+          <span>健康</span>
+        </div>
+        <div class="visual-stat">
+          <strong>{usage ? formatBytes(usage.totals.logical_nar_size) : '-'}</strong>
+          <span>逻辑占用</span>
+          <div class="bar"><span style="width: 100%"></span></div>
+        </div>
+        <div class="visual-stat">
+          <strong>{usage ? formatBytes(usage.totals.nar_size) : '-'}</strong>
+          <span>唯一 NAR</span>
+          <div class="bar"><span style={`width: ${usage?.totals?.logical_nar_size ? Math.max(8, (usage.totals.nar_size / usage.totals.logical_nar_size) * 100) : 0}%`}></span></div>
+        </div>
+        <div class="visual-stat">
+          <strong>{topCacheUsage ? `${topCacheUsage.cache.name} · ${formatBytes(topCacheUsage.nar_size)}` : '-'}</strong>
+          <span>最大缓存</span>
+          <div class="bar"><span style={`width: ${topCacheUsage ? bucketWidth(topCacheUsage, usage.cache_usage) : '0%'}`}></span></div>
+        </div>
+      </div>
+      <div class="rank-list compact-list">
+        {#each (usage?.cache_usage ?? []).slice(0, 3) as item}
+          <div class="rank-row">
+            <div>
+              <strong>{item.cache.name}</strong>
+              <span>{item.cache.objects} 对象 · {formatBytes(item.nar_size)}</span>
+            </div>
+            <div class="bar"><span style={`width: ${bucketWidth(item, usage.cache_usage)}`}></span></div>
+          </div>
+        {:else}
+          <p class="hint">暂无缓存使用数据。</p>
+        {/each}
+      </div>
+    {:else if usageTab === 'health'}
+      <div class="health-focus">
+        <div class="score-ring large" style={`--score: ${healthScore}; --score-color: ${scoreColor(healthScore)}`}>
+          <strong>{usage ? healthScore : '-'}</strong>
+          <span>{usage ? healthLabel(healthScore) : '等待'}</span>
+        </div>
+        <div class="health-bars">
+          <div><span>不完整</span><strong>{usage?.totals?.incomplete_objects ?? '-'}</strong></div>
+          <div><span>未访问</span><strong>{usage?.totals?.never_accessed_objects ?? '-'}</strong></div>
+          <div><span>建议</span><strong>{healthIssues.length}</strong></div>
+        </div>
+      </div>
+      <div class="issue-list compact-list">
+        {#each healthIssues.slice(0, 5) as issue}
+          <div class={`issue ${issue.severity}`}>
+            <strong>{issue.title}</strong>
+            <span>{issue.cache ? `${issue.cache} · ` : ''}{issue.detail}</span>
+          </div>
+        {:else}
+          <div class="issue ok">
+            <strong>没有发现明显问题</strong>
+            <span>不完整对象、空缓存和长期未访问对象会显示在这里。</span>
+          </div>
+        {/each}
+      </div>
+    {:else if usageTab === 'profile'}
+      <div class="bucket-columns">
+        <div>
+          <h3>System</h3>
+          {#each (usage?.systems ?? []).slice(0, 5) as item}
+            <div class="bucket-row">
+              <span>{item.name}</span>
+              <strong>{item.count}</strong>
+              <div class="bar"><span style={`width: ${bucketWidth(item, usage.systems)}`}></span></div>
+            </div>
+          {:else}
+            <p class="hint">暂无 system 数据。</p>
+          {/each}
+        </div>
+        <div>
+          <h3>Compression</h3>
+          {#each (usage?.compressions ?? []).slice(0, 5) as item}
+            <div class="bucket-row">
+              <span>{item.name}</span>
+              <strong>{item.count}</strong>
+              <div class="bar"><span style={`width: ${bucketWidth(item, usage.compressions)}`}></span></div>
+            </div>
+          {:else}
+            <p class="hint">暂无压缩数据。</p>
+          {/each}
+        </div>
+      </div>
+    {:else}
+      <div class="activity-list compact-list">
+        {#each recentActivity.slice(0, 6) as object}
+          <button class="activity-row secondary" type="button" on:click={() => copyText(object.store_path, 'Store path')}>
+            <strong>{object.store_path}</strong>
+            <span>{formatBytes(object.nar.nar_size)} · {object.system || 'unknown'} · {formatDate(object.created_at)}</span>
+          </button>
+        {:else}
+          <p class="hint">暂无上传记录。</p>
+        {/each}
+      </div>
+    {/if}
   </section>
 
   <section class="console-layout">

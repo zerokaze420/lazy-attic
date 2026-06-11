@@ -249,6 +249,7 @@ li,
 .metrics,
 .summary,
 .cache-grid,
+.usage-grid,
 .workspace,
 .command-grid,
 .grid,
@@ -266,7 +267,7 @@ li,
 
 .metrics,
 .summary {
-  grid-template-columns: 0.7fr 0.7fr 1fr 1.65fr;
+  grid-template-columns: 0.7fr 0.7fr 0.95fr 1.65fr;
   margin-bottom: 12px;
 }
 
@@ -310,6 +311,214 @@ li,
 .hero-panel h2 {
   margin-top: 2px;
   font-size: 1.25rem;
+}
+
+.usage-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px;
+}
+
+.visual-overview {
+  display: grid;
+  grid-template-columns: 132px repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.score-ring {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: 106px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at center, var(--surface) 0 54%, transparent 55%),
+    conic-gradient(var(--score-color, var(--primary)) calc(var(--score, 0) * 1%), var(--surface-muted) 0);
+  color: var(--text);
+}
+
+.score-ring.large {
+  width: 132px;
+  min-height: 132px;
+}
+
+.score-ring strong {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.score-ring span,
+.visual-stat span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+}
+
+.visual-stat {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #e5ebf2;
+  border-radius: 8px;
+  padding: 13px;
+  background: var(--surface-soft);
+}
+
+.visual-stat strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1.05rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.health-meter,
+.bar {
+  overflow: hidden;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.health-meter span,
+.bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.issue-list,
+.rank-list,
+.activity-list,
+.bucket-columns,
+.bucket-columns > div {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.issue {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px;
+  background: var(--surface-soft);
+}
+
+.issue span,
+.rank-row span,
+.bucket-row span,
+.activity-row span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+
+.issue.error {
+  border-color: #efbbb5;
+  background: var(--danger-soft);
+}
+
+.issue.warn {
+  border-color: #e1cfac;
+  background: #fff7e8;
+}
+
+.issue.ok {
+  border-color: #bedecb;
+  background: var(--success-soft);
+}
+
+.rank-row,
+.bucket-row {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rank-row > div:first-child,
+.bucket-row {
+  min-width: 0;
+}
+
+.rank-row strong,
+.bucket-row strong,
+.activity-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bucket-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bucket-columns h3 {
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.health-focus {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.health-bars {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.health-bars div {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #e5ebf2;
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface-soft);
+}
+
+.health-bars span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.health-bars strong {
+  font-size: 1.2rem;
+}
+
+.bucket-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.bucket-row .bar {
+  grid-column: 1 / -1;
+}
+
+.activity-row {
+  display: grid;
+  justify-content: stretch;
+  gap: 3px;
+  min-height: auto;
+  border-color: var(--line);
+  padding: 9px;
+  background: var(--surface-soft);
+  color: var(--text);
+  text-align: left;
+  transform: none;
+  box-shadow: none;
 }
 
 .quick-actions {
@@ -883,6 +1092,7 @@ pre {
   .metrics,
   .summary,
   .cache-grid,
+  .visual-overview,
   .workspace,
   .command-grid,
   .grid,
@@ -911,7 +1121,10 @@ pre {
   .summary-grid,
   .cache-toolbar,
   .object-tools,
-  .troubles {
+  .troubles,
+  .bucket-columns,
+  .health-focus,
+  .health-bars {
     grid-template-columns: 1fr;
   }
 
