@@ -101,6 +101,11 @@ bun run build
 - `main` 分支和手动触发会发布到 `latest` Release。
 - `v*` tag 会发布到对应 tag 的 Release。
 - Release 资产中只上传一个 `.lpk` 文件。
+- 从 Release 资产下载后直接安装 `.lpk` 文件：
+
+```bash
+lzc-cli lpk install cloud.lazycat.app.attic-v0.1.0-nix.lpk
+```
 
 ## 运行数据
 

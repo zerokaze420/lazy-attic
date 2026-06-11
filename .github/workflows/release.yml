@@ -37,14 +37,10 @@ jobs:
           cp result/*.lpk dist/
           count="$(find dist -maxdepth 1 -type f -name '*.lpk' | wc -l)"
           test "$count" = "1"
+          lpk="$(find dist -maxdepth 1 -type f -name '*.lpk' | head -n 1)"
+          tar -tf "$lpk" | grep -qx 'package.yml'
+          tar -tf "$lpk" | grep -qx 'manifest.yml'
           ls -lh dist
-
-      - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: lazy-attic-lpk
-          path: dist/*.lpk
-          if-no-files-found: error
 
       - name: Select release tag
         id: release
