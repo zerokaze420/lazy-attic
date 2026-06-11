@@ -1,15 +1,12 @@
 <script>
   import { Clipboard } from '@lucide/svelte';
-
-  export let label;
-  export let value;
-  export let oncopy;
+  let { label = '', value = '', oncopy } = $props();
 </script>
 
-<div class="line">
+<div class="info-row">
   <span>{label}</span>
   <code>{value}</code>
-  <button type="button" title={`复制${label}`} on:click={() => oncopy(value, label)}>
-    <Clipboard size={15} />
+  <button class="btn btn-ghost btn-sm btn-icon" title={`复制${label}`} onclick={() => oncopy?.(value, label)}>
+    <Clipboard size={13} />
   </button>
 </div>

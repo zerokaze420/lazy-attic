@@ -1,9 +1,8 @@
 <script>
-  export let label;
-  export let value;
+  let { label = '', value = '' } = $props();
 </script>
 
-<div class="block">
+<div class="info-block">
   <span>{label}</span>
   <code>{value}</code>
 </div>

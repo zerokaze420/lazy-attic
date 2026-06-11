@@ -101,7 +101,6 @@
       message = '请先回首页生成或复制管理员 Token。';
       return;
     }
-
     busy = true;
     message = '';
     try {
@@ -116,7 +115,6 @@
         retention_period:
           edit.retentionMode === 'global' ? 'Global' : { Period: Number(edit.retentionSeconds) }
       };
-
       const response = await fetch(`/_api/web/caches/${encodeURIComponent(cacheName)}/config`, {
         method: 'PATCH',
         headers: {
@@ -125,12 +123,10 @@
         },
         body: JSON.stringify(body)
       });
-
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || `HTTP ${response.status}`);
       }
-
       message = '缓存配置已保存。';
       await loadObjects(offset);
     } catch (err) {
@@ -145,10 +141,7 @@
       message = '请先回首页生成或复制管理员 Token。';
       return;
     }
-    if (!confirm(`删除缓存 ${cacheName}？这个操作会让该缓存不再可用。`)) {
-      return;
-    }
-
+    if (!confirm(`删除缓存 ${cacheName}？这个操作会让该缓存不再可用。`)) return;
     busy = true;
     message = '';
     try {
@@ -156,12 +149,10 @@
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token.trim()}` }
       });
-
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text || `HTTP ${response.status}`);
       }
-
       location.href = '/';
     } catch (err) {
       message = err instanceof Error ? err.message : String(err);
@@ -171,14 +162,10 @@
   }
 
   async function copyText(value, label) {
-    if (!value) {
-      return;
-    }
+    if (!value) return;
     await navigator.clipboard.writeText(value);
     copyMessage = `${label} 已复制`;
-    setTimeout(() => {
-      copyMessage = '';
-    }, 1800);
+    setTimeout(() => { copyMessage = ''; }, 1800);
   }
 
   function formatDate(value) {
@@ -186,9 +173,7 @@
   }
 
   function formatBytes(value) {
-    if (!Number.isFinite(value)) {
-      return '-';
-    }
+    if (!Number.isFinite(value)) return '-';
     const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
     let size = value;
     let unit = 0;
@@ -200,32 +185,22 @@
   }
 
   function formatRetention(seconds) {
-    if (seconds === null || seconds === undefined) {
-      return '全局默认';
-    }
-    if (seconds === 0) {
-      return '永久保留';
-    }
+    if (seconds === null || seconds === undefined) return '全局默认';
+    if (seconds === 0) return '永久保留';
     const days = Math.round(seconds / 86400);
     return days >= 1 ? `${days} 天` : `${Math.max(1, Math.round(seconds / 3600))} 小时`;
   }
 
   function matchesObject(object) {
     const query = objectQuery.trim().toLowerCase();
-    if (!query) {
-      return true;
-    }
+    if (!query) return true;
     return [
-      object.store_path,
-      object.store_path_hash,
-      object.system,
-      object.created_by,
-      object.deriver,
-      object.ca,
+      object.store_path, object.store_path_hash, object.system,
+      object.created_by, object.deriver, object.ca,
       object.nar?.nar_hash,
       ...(object.references ?? []),
       ...(object.sigs ?? [])
-    ].some((value) => String(value ?? '').toLowerCase().includes(query));
+    ].some((v) => String(v ?? '').toLowerCase().includes(query));
   }
 
   $: cache = payload?.cache;
@@ -237,211 +212,224 @@
 </script>
 
 <svelte:head>
-  <title>{cacheName ? `${cacheName} - Attic 缓存详情` : 'Attic 缓存详情'}</title>
+  <title>{cacheName ? `${cacheName} - Attic` : 'Attic Cache'}</title>
 </svelte:head>
 
-<main class="page">
-  <header class="topbar">
-    <a class="nav-link" href="/">
-      <ArrowLeft size={16} />
-      <span>返回</span>
-    </a>
-    <div class="title">
-      <p class="eyebrow">Cache Detail</p>
-      <h1>{cacheName || '缓存详情'}</h1>
+<div class="page-header">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <a class="btn btn-ghost btn-sm btn-icon" href="/">
+        <ArrowLeft size={16} />
+      </a>
+      <div>
+        <h1 class="page-title">{cacheName || 'Cache Detail'}</h1>
+        <p class="page-description">Cache Detail</p>
+      </div>
     </div>
-    <button class="secondary" type="button" on:click={() => loadObjects(offset)} disabled={loading}>
-      <span class:spin={loading}><RefreshCw size={16} /></span>
+    <button class="btn btn-secondary" type="button" on:click={() => loadObjects(offset)} disabled={loading}>
+      <span class:spin={loading}><RefreshCw size={15} /></span>
       <span>刷新</span>
     </button>
-  </header>
+  </div>
+</div>
 
+<div class="page-body">
   {#if error}
-    <section class="notice">
-      <AlertCircle size={18} />
+    <div class="notice">
+      <AlertCircle size={16} />
       <span>{error}</span>
-    </section>
+    </div>
   {/if}
 
   {#if cache}
-    <section class="summary">
-      <article class="metric">
-        <Box size={19} />
-        <span>对象</span>
-        <strong>{cache.objects}</strong>
-      </article>
-      <article class="metric">
-        <ShieldCheck size={19} />
-        <span>状态</span>
-        <strong>{cache.is_public ? '公开' : '私有'} · P{cache.priority}</strong>
-      </article>
-      <article class="metric wide">
-        <CheckCircle2 size={19} />
-        <span>保留策略</span>
-        <strong>{formatRetention(cache.retention_period)}</strong>
-      </article>
-      <article class="metric wide">
-        <ExternalLink size={19} />
-        <span>Substituter</span>
-        <strong>{cache.substituter_endpoint}</strong>
-      </article>
-    </section>
-
-    <section class="detail-layout">
-      <section class="panel config-panel">
-        <div class="panel-head">
-          <div>
-            <h2>{configTab === 'settings' ? '缓存配置' : '连接信息'}</h2>
-            <p>{configTab === 'settings' ? '修改后立即调用 Attic 配置接口。' : '这些值可直接复制到客户端或 Nix 配置。'}</p>
-          </div>
-          <div class="segmented">
-            <button class:active={configTab === 'settings'} class="secondary" type="button" on:click={() => configTab = 'settings'}>
-              <Settings2 size={15} />
-              <span>配置</span>
-            </button>
-            <button class:active={configTab === 'connection'} class="secondary" type="button" on:click={() => configTab = 'connection'}>
-              <Info size={15} />
-              <span>连接</span>
-            </button>
-          </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon"><Box size={18} /></div>
+        <div class="stat-content">
+          <span class="stat-label">Objects</span>
+          <span class="stat-value">{cache.objects}</span>
         </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><ShieldCheck size={18} /></div>
+        <div class="stat-content">
+          <span class="stat-label">Status</span>
+          <span class="stat-value">{cache.is_public ? '公开' : '私有'} · P{cache.priority}</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><CheckCircle2 size={18} /></div>
+        <div class="stat-content">
+          <span class="stat-label">Retention</span>
+          <span class="stat-value">{formatRetention(cache.retention_period)}</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><ExternalLink size={18} /></div>
+        <div class="stat-content">
+          <span class="stat-label">Substituter</span>
+          <span class="stat-value" style="font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px;">{cache.substituter_endpoint}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>{configTab === 'settings' ? '缓存配置' : '连接信息'}</h2>
+          <p>{configTab === 'settings' ? '修改后立即调用 Attic 配置接口。' : '这些值可直接复制到客户端或 Nix 配置。'}</p>
+        </div>
+        <div class="tabs">
+          <button class="tab" class:active={configTab === 'settings'} on:click={() => configTab = 'settings'}>
+            <Settings2 size={13} />
+            <span>配置</span>
+          </button>
+          <button class="tab" class:active={configTab === 'connection'} on:click={() => configTab = 'connection'}>
+            <Info size={13} />
+            <span>连接</span>
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
         {#if configTab === 'settings'}
           <div class="form-grid">
-            <label>
+            <label class="label">
               <span>Store 目录</span>
-              <input bind:value={edit.storeDir} />
+              <input class="input" bind:value={edit.storeDir} />
             </label>
-            <label>
+            <label class="label">
               <span>优先级</span>
-              <input type="number" bind:value={edit.priority} />
+              <input class="input" type="number" bind:value={edit.priority} />
             </label>
-            <label class="check">
+            <label class="checkbox-label">
               <input type="checkbox" bind:checked={edit.isPublic} />
               <span>公开缓存</span>
             </label>
-            <label>
+            <label class="label">
               <span>保留策略</span>
-              <select bind:value={edit.retentionMode}>
+              <select class="select" bind:value={edit.retentionMode}>
                 <option value="global">全局默认</option>
                 <option value="period">指定秒数</option>
               </select>
             </label>
             {#if edit.retentionMode === 'period'}
-              <label>
+              <label class="label">
                 <span>保留秒数</span>
-                <input type="number" min="0" bind:value={edit.retentionSeconds} />
+                <input class="input" type="number" min="0" bind:value={edit.retentionSeconds} />
               </label>
             {/if}
-            <label class="full">
+            <label class="label full-width">
               <span>上游 key，每行一个或逗号分隔</span>
-              <textarea bind:value={edit.upstream} rows="3"></textarea>
+              <textarea class="textarea" bind:value={edit.upstream} rows="3"></textarea>
             </label>
           </div>
-          <div class="actions">
-            <button type="button" on:click={saveCache} disabled={busy}>
-              <Save size={16} />
+          <div class="form-actions" style="margin-top:16px;">
+            <button class="btn btn-primary" type="button" on:click={saveCache} disabled={busy}>
+              <Save size={15} />
               <span>{busy ? '处理中' : '保存配置'}</span>
             </button>
-            <button class="danger" type="button" on:click={deleteCache} disabled={busy}>
-              <Trash2 size={16} />
+            <button class="btn btn-destructive" type="button" on:click={deleteCache} disabled={busy}>
+              <Trash2 size={15} />
               <span>删除缓存</span>
             </button>
           </div>
           {#if message}
-            <p class="hint">{message}</p>
+            <p style="font-size:0.8rem;color:hsl(var(--muted-foreground));margin-top:12px;">{message}</p>
           {/if}
         {:else}
-          <div class="connection-list">
+          <div class="connection-grid">
             <InfoLine label="API Endpoint" value={cache.api_endpoint} oncopy={copyText} />
             <InfoLine label="Substituter" value={cache.substituter_endpoint} oncopy={copyText} />
             <InfoLine label="Public key" value={cache.public_key} oncopy={copyText} />
             <InfoLine label="Upstream keys" value={(cache.upstream_cache_key_names ?? []).join(', ') || '无'} oncopy={copyText} />
           </div>
         {/if}
-      </section>
-    </section>
+      </div>
+    </div>
 
-    <section class="objects">
-      <div class="section-head">
+    <div class="card">
+      <div class="card-header">
         <div>
           <h2>Store paths</h2>
-          <p>最近上传优先，当前页显示 {visibleObjects.length} / {objects.length}，全量 {total}。</p>
+          <p>当前页 {visibleObjects.length} / {objects.length}，全量 {total}。</p>
         </div>
-        <div class="pager">
-          <button class="secondary" type="button" disabled={!hasPrev || loading} on:click={() => loadObjects(offset - limit)}>上一页</button>
-          <button class="secondary" type="button" disabled={!hasNext || loading} on:click={() => loadObjects(offset + limit)}>下一页</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="search-wrapper" style="width:260px;">
+            <Search size={14} />
+            <input class="input" bind:value={objectQuery} placeholder="搜索 store path、hash..." autocomplete="off" />
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" disabled={!hasPrev || loading} on:click={() => loadObjects(offset - limit)}>上一页</button>
+          <button class="btn btn-secondary btn-sm" type="button" disabled={!hasNext || loading} on:click={() => loadObjects(offset + limit)}>下一页</button>
         </div>
       </div>
+      <div class="card-body no-padding">
+        <div class="object-layout">
+          <div class="object-list-panel">
+            {#if visibleObjects.length}
+              {#each visibleObjects as object}
+                <button
+                  class="object-item"
+                  class:active={selected?.store_path_hash === object.store_path_hash}
+                  type="button"
+                  on:click={() => selected = object}
+                >
+                  <strong>{object.store_path}</strong>
+                  <span>{object.system || 'unknown'} · {formatBytes(object.nar.nar_size)} · {formatDate(object.created_at)}</span>
+                </button>
+              {/each}
+            {:else}
+              <div class="empty">{loading ? '正在加载对象...' : '没有匹配的 store path。'}</div>
+            {/if}
+          </div>
 
-      <section class="panel object-tools">
-        <label class="search-field">
-          <Search size={16} />
-          <input bind:value={objectQuery} placeholder="搜索 store path、hash、system、引用" autocomplete="off" />
-        </label>
-        <span class="status-pill">
-          <FileSearch size={15} />
-          {offset + 1}-{Math.min(offset + limit, total)} / {total}
-        </span>
-      </section>
+          <div class="object-detail-panel">
+            {#if selected}
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>对象详情</h2>
+                    <p>{selected.store_path_hash}</p>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" type="button" on:click={() => copyText(selected.store_path, 'Store path')}>
+                    <Clipboard size={14} />
+                    <span>复制路径</span>
+                  </button>
+                </div>
+                <div class="card-body">
+                  <InfoLine label="Store path" value={selected.store_path} oncopy={copyText} />
+                  <InfoLine label="Narinfo" value={selected.narinfo_url} oncopy={copyText} />
+                  <InfoLine label="NAR URL" value={selected.nar_url} oncopy={copyText} />
 
-      <div class="object-grid">
-        <section class="object-list">
-          {#if visibleObjects.length}
-            {#each visibleObjects as object}
-              <button
-                class:selected={selected?.store_path_hash === object.store_path_hash}
-                class="object-row"
-                type="button"
-                on:click={() => selected = object}
-              >
-                <strong>{object.store_path}</strong>
-                <span>{object.system || 'unknown'} · {formatBytes(object.nar.nar_size)} · {formatDate(object.created_at)}</span>
-              </button>
-            {/each}
-          {:else}
-            <div class="empty panel">{loading ? '正在加载对象...' : '没有匹配的 store path。'}</div>
-          {/if}
-        </section>
+                  <div class="detail-grid" style="margin-top:12px;">
+                    <div class="detail-item"><span>System</span><strong>{selected.system || '-'}</strong></div>
+                    <div class="detail-item"><span>上传者</span><strong>{selected.created_by || '-'}</strong></div>
+                    <div class="detail-item"><span>创建时间</span><strong>{formatDate(selected.created_at)}</strong></div>
+                    <div class="detail-item"><span>最后访问</span><strong>{formatDate(selected.last_accessed_at)}</strong></div>
+                    <div class="detail-item"><span>NAR 大小</span><strong>{formatBytes(selected.nar.nar_size)}</strong></div>
+                    <div class="detail-item"><span>压缩</span><strong>{selected.nar.compression}</strong></div>
+                    <div class="detail-item"><span>分块</span><strong>{selected.nar.num_chunks}</strong></div>
+                    <div class="detail-item"><span>完整</span><strong>{selected.nar.completeness_hint ? '是' : '否'}</strong></div>
+                  </div>
 
-        {#if selected}
-          <section class="panel object-detail">
-            <div class="panel-head">
-              <div>
-                <h2>对象详情</h2>
-                <p>{selected.store_path_hash}</p>
+                  <InfoBlock label="NAR hash" value={selected.nar.nar_hash} />
+                  <InfoBlock label="Deriver" value={selected.deriver || '-'} />
+                  <InfoBlock label="Content address" value={selected.ca || '-'} />
+                  <InfoBlock label="References" value={selected.references.length ? selected.references.join('\n') : '无'} />
+                  <InfoBlock label="Signatures" value={selected.sigs.length ? selected.sigs.join('\n') : '无'} />
+                </div>
               </div>
-              <button class="secondary" type="button" on:click={() => copyText(selected.store_path, 'Store path')}>
-                <Clipboard size={16} />
-                <span>复制路径</span>
-              </button>
-            </div>
-            <InfoLine label="Store path" value={selected.store_path} oncopy={copyText} />
-            <InfoLine label="Narinfo" value={selected.narinfo_url} oncopy={copyText} />
-            <InfoLine label="NAR URL" value={selected.nar_url} oncopy={copyText} />
-            <div class="detail-grid">
-              <div><span>System</span><strong>{selected.system || '-'}</strong></div>
-              <div><span>上传者</span><strong>{selected.created_by || '-'}</strong></div>
-              <div><span>创建时间</span><strong>{formatDate(selected.created_at)}</strong></div>
-              <div><span>最后访问</span><strong>{formatDate(selected.last_accessed_at)}</strong></div>
-              <div><span>NAR 大小</span><strong>{formatBytes(selected.nar.nar_size)}</strong></div>
-              <div><span>压缩</span><strong>{selected.nar.compression}</strong></div>
-              <div><span>分块</span><strong>{selected.nar.num_chunks}</strong></div>
-              <div><span>完整</span><strong>{selected.nar.completeness_hint ? '是' : '否'}</strong></div>
-            </div>
-            <InfoBlock label="NAR hash" value={selected.nar.nar_hash} />
-            <InfoBlock label="Deriver" value={selected.deriver || '-'} />
-            <InfoBlock label="Content address" value={selected.ca || '-'} />
-            <InfoBlock label="References" value={selected.references.length ? selected.references.join('\n') : '无'} />
-            <InfoBlock label="Signatures" value={selected.sigs.length ? selected.sigs.join('\n') : '无'} />
-          </section>
-        {/if}
+            {:else}
+              <div class="empty">选择左侧对象查看详情</div>
+            {/if}
+          </div>
+        </div>
       </div>
-    </section>
+    </div>
   {:else if loading}
-    <section class="empty panel">正在加载缓存详情...</section>
+    <div class="empty">正在加载缓存详情...</div>
   {/if}
+</div>
 
-  {#if copyMessage}
-    <div class="toast">{copyMessage}</div>
-  {/if}
-</main>
+{#if copyMessage}
+  <div class="toast">{copyMessage}</div>
+{/if}
