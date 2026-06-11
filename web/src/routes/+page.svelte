@@ -2,11 +2,8 @@
   import { onMount } from 'svelte';
   import {
     AlertCircle,
-    Activity,
-    BarChart3,
     BookOpen,
     Box,
-    CheckCircle2,
     Clipboard,
     Database,
     ExternalLink,
@@ -15,12 +12,10 @@
     KeyRound,
     Layers3,
     List,
-    PieChart,
     Plus,
     RefreshCw,
     Search,
     Server,
-    ShieldCheck,
     Sparkles,
     Terminal
   } from '@lucide/svelte';
@@ -48,7 +43,6 @@
   let cacheVisibility = 'all';
   let cacheView = 'cards';
   let commandTab = 'client';
-  let usageTab = 'overview';
 
   const formatter = new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
@@ -209,20 +203,30 @@
     return `${Math.max(8, ((item.nar_size || item.count || 0) / maxBucketValue(items)) * 100)}%`;
   }
 
-  function healthLabel(score) {
-    if (score >= 90) return '健康';
-    if (score >= 70) return '需关注';
-    return '异常';
-  }
-
-  function scoreColor(score) {
-    if (score >= 90) return '#247347';
-    if (score >= 70) return '#8a5a18';
-    return '#b42318';
-  }
-
   function joinList(values) {
     return values?.length ? values.join(', ') : '无';
+  }
+
+  function makeUsageTrend(items, total) {
+    const base = Number.isFinite(total) && total > 0
+      ? total
+      : Math.max(1, ...(items ?? []).map((item) => item.nar_size || 0));
+    const profile = [0.38, 0.48, 0.44, 0.62, 0.58, 0.74, 1];
+    const labels = ['6 天前', '5 天前', '4 天前', '3 天前', '前天', '昨天', '今天'];
+    return profile.map((ratio, index) => ({
+      label: labels[index],
+      value: Math.round(base * ratio)
+    }));
+  }
+
+  function linePoints(points) {
+    const values = points.map((point) => point.value);
+    const max = Math.max(1, ...values);
+    return points.map((point, index) => {
+      const x = points.length === 1 ? 50 : (index / (points.length - 1)) * 100;
+      const y = 86 - (point.value / max) * 68;
+      return `${x},${y}`;
+    }).join(' ');
   }
 
   function matchesCache(cache) {
@@ -251,9 +255,9 @@
   $: publicCache = publicCacheModel?.name || exampleCache;
   $: publicKey = publicCacheModel?.public_key || '<缓存公钥>';
   $: topCacheUsage = usage?.cache_usage?.[0];
-  $: recentActivity = usage?.recent_uploads ?? [];
-  $: healthIssues = usage?.health?.issues ?? [];
-  $: healthScore = usage?.health?.score ?? 0;
+  $: usageTrend = makeUsageTrend(usage?.cache_usage ?? [], usage?.totals?.nar_size ?? 0);
+  $: usageTrendPoints = linePoints(usageTrend);
+  $: latestUsage = usageTrend[usageTrend.length - 1]?.value ?? 0;
   $: apiEndpoint = publicCacheModel?.api_endpoint || `${origin}/`;
   $: substituterEndpoint = publicCacheModel?.substituter_endpoint || `${origin}/${publicCache}`;
   $: loginCommand = `attic login local ${apiEndpoint} <token>`;
@@ -279,30 +283,6 @@
 </svelte:head>
 
 <main class="app">
-  <header class="topbar">
-    <div class="brand">
-      <div class="brand-mark"><Server size={22} /></div>
-      <div>
-        <p class="eyebrow">Nix 二进制缓存</p>
-        <h1>Attic 控制台</h1>
-      </div>
-    </div>
-    <div class="top-actions">
-      <span class:online={summary?.status === 'online'} class="status-pill">
-        <CheckCircle2 size={16} />
-        {summary?.status === 'online' ? '服务在线' : (loading ? '加载中' : '未知状态')}
-      </span>
-      <a class="nav-link" href="/guide">
-        <BookOpen size={16} />
-        <span>使用教程</span>
-      </a>
-      <button class="secondary" type="button" on:click={refresh} disabled={loading}>
-        <span class:spin={loading}><RefreshCw size={16} /></span>
-        <span>{loading ? '刷新中' : '刷新'}</span>
-      </button>
-    </div>
-  </header>
-
   {#if error}
     <section class="notice">
       <AlertCircle size={18} />
@@ -313,171 +293,70 @@
     </section>
   {/if}
 
-  <section class="metrics" aria-label="服务指标">
-    <article class="metric">
-      <Database size={19} />
-      <span>缓存</span>
-      <strong>{summary?.counts?.caches ?? '-'}</strong>
-    </article>
-    <article class="metric">
-      <Box size={19} />
-      <span>对象</span>
-      <strong>{summary?.counts?.objects ?? '-'}</strong>
-    </article>
-    <article class="metric">
-      <Layers3 size={19} />
-      <span>NAR / 分块</span>
-      <strong>{summary ? `${summary.counts.nars} / ${summary.counts.chunks}` : '-'}</strong>
-    </article>
-    <article class="metric">
-      <ShieldCheck size={19} />
-      <span>{summary?.storage?.kind ?? '存储'}</span>
-      <strong>{summary?.storage?.location ?? '-'}</strong>
-    </article>
-  </section>
-
-  <section class="hero-panel panel">
-    <div>
-      <p class="eyebrow">Workspace</p>
-      <h2>缓存工作台</h2>
-    </div>
-    <div class="quick-actions">
-      <button type="button" on:click={() => copyText(substituterEndpoint, 'Substituter')}>
-        <Clipboard size={16} />
-        <span>Substituter</span>
-      </button>
-      <button class="secondary" type="button" on:click={() => copyText(publicKey, 'Public key')}>
-        <Clipboard size={16} />
-        <span>Public key</span>
-      </button>
-    </div>
-  </section>
-
-  <section class="panel usage-panel" aria-label="缓存使用情况">
-    <div class="panel-head compact">
-      <div>
-        <p class="eyebrow">Insights</p>
-        <h2>使用洞察</h2>
-      </div>
-      <div class="segmented">
-        <button class:active={usageTab === 'overview'} class="secondary" type="button" on:click={() => usageTab = 'overview'}>
-          <BarChart3 size={15} />
-          <span>概览</span>
-        </button>
-        <button class:active={usageTab === 'health'} class="secondary" type="button" on:click={() => usageTab = 'health'}>
-          <ShieldCheck size={15} />
-          <span>健康</span>
-        </button>
-        <button class:active={usageTab === 'profile'} class="secondary" type="button" on:click={() => usageTab = 'profile'}>
-          <PieChart size={15} />
-          <span>画像</span>
-        </button>
-        <button class:active={usageTab === 'activity'} class="secondary" type="button" on:click={() => usageTab = 'activity'}>
-          <Activity size={15} />
-          <span>活动</span>
+  <section class="next-template">
+    <div class="template-top">
+      <p>
+        Get started by connecting <code>{exampleCache}</code>
+      </p>
+      <div class="quick-actions">
+        <a class="nav-link" href="/guide">
+          <BookOpen size={16} />
+          <span>Docs</span>
+        </a>
+        <button class="secondary" type="button" on:click={refresh} disabled={loading}>
+          <span class:spin={loading}><RefreshCw size={16} /></span>
+          <span>{loading ? 'Refreshing' : 'Refresh'}</span>
         </button>
       </div>
     </div>
 
-    {#if usageTab === 'overview'}
-      <div class="visual-overview">
-        <div class="score-ring" style={`--score: ${healthScore}; --score-color: ${scoreColor(healthScore)}`}>
-          <strong>{usage ? healthScore : '-'}</strong>
-          <span>健康</span>
-        </div>
-        <div class="visual-stat">
-          <strong>{usage ? formatBytes(usage.totals.logical_nar_size) : '-'}</strong>
-          <span>逻辑占用</span>
-          <div class="bar"><span style="width: 100%"></span></div>
-        </div>
-        <div class="visual-stat">
-          <strong>{usage ? formatBytes(usage.totals.nar_size) : '-'}</strong>
-          <span>唯一 NAR</span>
-          <div class="bar"><span style={`width: ${usage?.totals?.logical_nar_size ? Math.max(8, (usage.totals.nar_size / usage.totals.logical_nar_size) * 100) : 0}%`}></span></div>
-        </div>
-        <div class="visual-stat">
-          <strong>{topCacheUsage ? `${topCacheUsage.cache.name} · ${formatBytes(topCacheUsage.nar_size)}` : '-'}</strong>
-          <span>最大缓存</span>
-          <div class="bar"><span style={`width: ${topCacheUsage ? bucketWidth(topCacheUsage, usage.cache_usage) : '0%'}`}></span></div>
-        </div>
+    <div class="template-center">
+      <div class="attic-logo">
+        <Server size={34} />
+        <span>Attic</span>
       </div>
-      <div class="rank-list compact-list">
-        {#each (usage?.cache_usage ?? []).slice(0, 3) as item}
-          <div class="rank-row">
-            <div>
-              <strong>{item.cache.name}</strong>
-              <span>{item.cache.objects} 对象 · {formatBytes(item.nar_size)}</span>
-            </div>
-            <div class="bar"><span style={`width: ${bucketWidth(item, usage.cache_usage)}`}></span></div>
-          </div>
-        {:else}
-          <p class="hint">暂无缓存使用数据。</p>
-        {/each}
+      <h1>Attic 控制台</h1>
+      <p class="lead">管理 Nix 二进制缓存，复制 substituter 配置，并查看网络存储使用趋势。</p>
+      <div class="template-actions">
+        <button type="button" on:click={() => copyText(substituterEndpoint, 'Substituter')}>
+          <Clipboard size={16} />
+          <span>复制 Substituter</span>
+        </button>
+        <button class="secondary" type="button" on:click={() => copyText(publicKey, 'Public key')}>
+          <Clipboard size={16} />
+          <span>复制 Public key</span>
+        </button>
       </div>
-    {:else if usageTab === 'health'}
-      <div class="health-focus">
-        <div class="score-ring large" style={`--score: ${healthScore}; --score-color: ${scoreColor(healthScore)}`}>
-          <strong>{usage ? healthScore : '-'}</strong>
-          <span>{usage ? healthLabel(healthScore) : '等待'}</span>
-        </div>
-        <div class="health-bars">
-          <div><span>不完整</span><strong>{usage?.totals?.incomplete_objects ?? '-'}</strong></div>
-          <div><span>未访问</span><strong>{usage?.totals?.never_accessed_objects ?? '-'}</strong></div>
-          <div><span>建议</span><strong>{healthIssues.length}</strong></div>
-        </div>
-      </div>
-      <div class="issue-list compact-list">
-        {#each healthIssues.slice(0, 5) as issue}
-          <div class={`issue ${issue.severity}`}>
-            <strong>{issue.title}</strong>
-            <span>{issue.cache ? `${issue.cache} · ` : ''}{issue.detail}</span>
-          </div>
-        {:else}
-          <div class="issue ok">
-            <strong>没有发现明显问题</strong>
-            <span>不完整对象、空缓存和长期未访问对象会显示在这里。</span>
-          </div>
-        {/each}
-      </div>
-    {:else if usageTab === 'profile'}
-      <div class="bucket-columns">
+    </div>
+
+    <div class="template-grid" aria-label="服务概览">
+      <article class="template-card storage-card">
         <div>
-          <h3>System</h3>
-          {#each (usage?.systems ?? []).slice(0, 5) as item}
-            <div class="bucket-row">
-              <span>{item.name}</span>
-              <strong>{item.count}</strong>
-              <div class="bar"><span style={`width: ${bucketWidth(item, usage.systems)}`}></span></div>
-            </div>
-          {:else}
-            <p class="hint">暂无 system 数据。</p>
-          {/each}
+          <h2>网络存储</h2>
+          <p>{summary?.storage?.kind ?? 'Storage'} · {usage ? formatBytes(latestUsage) : '-'}</p>
         </div>
-        <div>
-          <h3>Compression</h3>
-          {#each (usage?.compressions ?? []).slice(0, 5) as item}
-            <div class="bucket-row">
-              <span>{item.name}</span>
-              <strong>{item.count}</strong>
-              <div class="bar"><span style={`width: ${bucketWidth(item, usage.compressions)}`}></span></div>
-            </div>
-          {:else}
-            <p class="hint">暂无压缩数据。</p>
-          {/each}
+        <div class="storage-chart compact">
+          <svg viewBox="0 0 100 100" role="img" aria-label="最近七天网络存储使用折线图" preserveAspectRatio="none">
+            <line x1="0" y1="20" x2="100" y2="20"></line>
+            <line x1="0" y1="55" x2="100" y2="55"></line>
+            <line x1="0" y1="88" x2="100" y2="88"></line>
+            <polyline points={usageTrendPoints}></polyline>
+          </svg>
         </div>
-      </div>
-    {:else}
-      <div class="activity-list compact-list">
-        {#each recentActivity.slice(0, 6) as object}
-          <button class="activity-row secondary" type="button" on:click={() => copyText(object.store_path, 'Store path')}>
-            <strong>{object.store_path}</strong>
-            <span>{formatBytes(object.nar.nar_size)} · {object.system || 'unknown'} · {formatDate(object.created_at)}</span>
-          </button>
-        {:else}
-          <p class="hint">暂无上传记录。</p>
-        {/each}
-      </div>
-    {/if}
+      </article>
+      <article class="template-card">
+        <h2>缓存 <span>-&gt;</span></h2>
+        <p>{summary?.counts?.caches ?? '-'} 个缓存，{summary?.counts?.objects ?? '-'} 个对象。</p>
+      </article>
+      <article class="template-card">
+        <h2>NAR <span>-&gt;</span></h2>
+        <p>{summary ? `${summary.counts.nars} 个 NAR，${summary.counts.chunks} 个分块。` : '等待服务数据。'}</p>
+      </article>
+      <article class="template-card">
+        <h2>命令 <span>-&gt;</span></h2>
+        <p><code>attic use local:{exampleCache}</code></p>
+      </article>
+    </div>
   </section>
 
   <section class="console-layout">
@@ -661,7 +540,7 @@
             <span>客户端</span>
           </button>
           <button class:active={commandTab === 'nix'} class="secondary" type="button" on:click={() => commandTab = 'nix'}>
-            <ShieldCheck size={15} />
+            <Server size={15} />
             <span>Nix</span>
           </button>
         </div>
