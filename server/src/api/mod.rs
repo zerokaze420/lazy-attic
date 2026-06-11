@@ -42,12 +42,14 @@ pub(crate) fn get_router() -> Router {
         );
 
     if let Some(web_dir) = web_dir() {
+        let web_index = web_dir.join("index.html");
+
         router
-            .route_service("/", ServeFile::new(web_dir.join("index.html")))
-            .route_service("/cache", ServeFile::new(web_dir.join("cache/index.html")))
-            .route_service("/cache/", ServeFile::new(web_dir.join("cache/index.html")))
-            .route_service("/guide", ServeFile::new(web_dir.join("guide/index.html")))
-            .route_service("/guide/", ServeFile::new(web_dir.join("guide/index.html")))
+            .route_service("/", ServeFile::new(web_index.clone()))
+            .route_service("/cache", ServeFile::new(web_index.clone()))
+            .route_service("/cache/", ServeFile::new(web_index.clone()))
+            .route_service("/guide", ServeFile::new(web_index.clone()))
+            .route_service("/guide/", ServeFile::new(web_index))
             .nest_service("/_app", ServeDir::new(web_dir.join("_app")))
             .nest_service("/favicon.ico", ServeFile::new(web_dir.join("favicon.ico")))
     } else {
