@@ -7,8 +7,12 @@
     CheckCircle2,
     Clipboard,
     ExternalLink,
+    FileSearch,
+    Info,
     RefreshCw,
     Save,
+    Search,
+    Settings2,
     ShieldCheck,
     Trash2
   } from '@lucide/svelte';
@@ -25,6 +29,8 @@
   let message = '';
   let copyMessage = '';
   let offset = 0;
+  let objectQuery = '';
+  let configTab = 'settings';
   const limit = 12;
 
   let edit = {
@@ -204,8 +210,27 @@
     return days >= 1 ? `${days} 天` : `${Math.max(1, Math.round(seconds / 3600))} 小时`;
   }
 
+  function matchesObject(object) {
+    const query = objectQuery.trim().toLowerCase();
+    if (!query) {
+      return true;
+    }
+    return [
+      object.store_path,
+      object.store_path_hash,
+      object.system,
+      object.created_by,
+      object.deriver,
+      object.ca,
+      object.nar?.nar_hash,
+      ...(object.references ?? []),
+      ...(object.sigs ?? [])
+    ].some((value) => String(value ?? '').toLowerCase().includes(query));
+  }
+
   $: cache = payload?.cache;
   $: objects = payload?.objects ?? [];
+  $: visibleObjects = objects.filter(matchesObject);
   $: total = payload?.total ?? 0;
   $: hasPrev = offset > 0;
   $: hasNext = offset + limit < total;
@@ -262,72 +287,77 @@
       </article>
     </section>
 
-    <section class="grid">
-      <section class="panel editor">
+    <section class="detail-layout">
+      <section class="panel config-panel">
         <div class="panel-head">
           <div>
-            <h2>缓存配置</h2>
-            <p>修改后立即调用 Attic 配置接口。</p>
+            <h2>{configTab === 'settings' ? '缓存配置' : '连接信息'}</h2>
+            <p>{configTab === 'settings' ? '修改后立即调用 Attic 配置接口。' : '这些值可直接复制到客户端或 Nix 配置。'}</p>
           </div>
-          <span class="tag">{cache.store_dir}</span>
+          <div class="segmented">
+            <button class:active={configTab === 'settings'} class="secondary" type="button" on:click={() => configTab = 'settings'}>
+              <Settings2 size={15} />
+              <span>配置</span>
+            </button>
+            <button class:active={configTab === 'connection'} class="secondary" type="button" on:click={() => configTab = 'connection'}>
+              <Info size={15} />
+              <span>连接</span>
+            </button>
+          </div>
         </div>
-        <div class="form-grid">
-          <label>
-            <span>Store 目录</span>
-            <input bind:value={edit.storeDir} />
-          </label>
-          <label>
-            <span>优先级</span>
-            <input type="number" bind:value={edit.priority} />
-          </label>
-          <label class="check">
-            <input type="checkbox" bind:checked={edit.isPublic} />
-            <span>公开缓存</span>
-          </label>
-          <label>
-            <span>保留策略</span>
-            <select bind:value={edit.retentionMode}>
-              <option value="global">全局默认</option>
-              <option value="period">指定秒数</option>
-            </select>
-          </label>
-          {#if edit.retentionMode === 'period'}
+        {#if configTab === 'settings'}
+          <div class="form-grid">
             <label>
-              <span>保留秒数</span>
-              <input type="number" min="0" bind:value={edit.retentionSeconds} />
+              <span>Store 目录</span>
+              <input bind:value={edit.storeDir} />
             </label>
-          {/if}
-          <label class="full">
-            <span>上游 key，每行一个或逗号分隔</span>
-            <textarea bind:value={edit.upstream} rows="3"></textarea>
-          </label>
-        </div>
-        <div class="actions">
-          <button type="button" on:click={saveCache} disabled={busy}>
-            <Save size={16} />
-            <span>{busy ? '处理中' : '保存配置'}</span>
-          </button>
-          <button class="danger" type="button" on:click={deleteCache} disabled={busy}>
-            <Trash2 size={16} />
-            <span>删除缓存</span>
-          </button>
-        </div>
-        {#if message}
-          <p class="hint">{message}</p>
-        {/if}
-      </section>
-
-      <section class="panel info">
-        <div class="panel-head">
-          <div>
-            <h2>连接信息</h2>
-            <p>这些值可直接复制到客户端或 Nix 配置。</p>
+            <label>
+              <span>优先级</span>
+              <input type="number" bind:value={edit.priority} />
+            </label>
+            <label class="check">
+              <input type="checkbox" bind:checked={edit.isPublic} />
+              <span>公开缓存</span>
+            </label>
+            <label>
+              <span>保留策略</span>
+              <select bind:value={edit.retentionMode}>
+                <option value="global">全局默认</option>
+                <option value="period">指定秒数</option>
+              </select>
+            </label>
+            {#if edit.retentionMode === 'period'}
+              <label>
+                <span>保留秒数</span>
+                <input type="number" min="0" bind:value={edit.retentionSeconds} />
+              </label>
+            {/if}
+            <label class="full">
+              <span>上游 key，每行一个或逗号分隔</span>
+              <textarea bind:value={edit.upstream} rows="3"></textarea>
+            </label>
           </div>
-        </div>
-        <InfoLine label="API Endpoint" value={cache.api_endpoint} oncopy={copyText} />
-        <InfoLine label="Substituter" value={cache.substituter_endpoint} oncopy={copyText} />
-        <InfoLine label="Public key" value={cache.public_key} oncopy={copyText} />
-        <InfoLine label="Upstream keys" value={(cache.upstream_cache_key_names ?? []).join(', ') || '无'} oncopy={copyText} />
+          <div class="actions">
+            <button type="button" on:click={saveCache} disabled={busy}>
+              <Save size={16} />
+              <span>{busy ? '处理中' : '保存配置'}</span>
+            </button>
+            <button class="danger" type="button" on:click={deleteCache} disabled={busy}>
+              <Trash2 size={16} />
+              <span>删除缓存</span>
+            </button>
+          </div>
+          {#if message}
+            <p class="hint">{message}</p>
+          {/if}
+        {:else}
+          <div class="connection-list">
+            <InfoLine label="API Endpoint" value={cache.api_endpoint} oncopy={copyText} />
+            <InfoLine label="Substituter" value={cache.substituter_endpoint} oncopy={copyText} />
+            <InfoLine label="Public key" value={cache.public_key} oncopy={copyText} />
+            <InfoLine label="Upstream keys" value={(cache.upstream_cache_key_names ?? []).join(', ') || '无'} oncopy={copyText} />
+          </div>
+        {/if}
       </section>
     </section>
 
@@ -335,7 +365,7 @@
       <div class="section-head">
         <div>
           <h2>Store paths</h2>
-          <p>最近上传优先，当前显示 {offset + 1}-{Math.min(offset + limit, total)} / {total}。</p>
+          <p>最近上传优先，当前页显示 {visibleObjects.length} / {objects.length}，全量 {total}。</p>
         </div>
         <div class="pager">
           <button class="secondary" type="button" disabled={!hasPrev || loading} on:click={() => loadObjects(offset - limit)}>上一页</button>
@@ -343,10 +373,21 @@
         </div>
       </div>
 
+      <section class="panel object-tools">
+        <label class="search-field">
+          <Search size={16} />
+          <input bind:value={objectQuery} placeholder="搜索 store path、hash、system、引用" autocomplete="off" />
+        </label>
+        <span class="status-pill">
+          <FileSearch size={15} />
+          {offset + 1}-{Math.min(offset + limit, total)} / {total}
+        </span>
+      </section>
+
       <div class="object-grid">
         <section class="object-list">
-          {#if objects.length}
-            {#each objects as object}
+          {#if visibleObjects.length}
+            {#each visibleObjects as object}
               <button
                 class:selected={selected?.store_path_hash === object.store_path_hash}
                 class="object-row"
@@ -358,7 +399,7 @@
               </button>
             {/each}
           {:else}
-            <div class="empty panel">{loading ? '正在加载对象...' : '还没有上传 store path。'}</div>
+            <div class="empty panel">{loading ? '正在加载对象...' : '没有匹配的 store path。'}</div>
           {/if}
         </section>
 
@@ -404,354 +445,3 @@
     <div class="toast">{copyMessage}</div>
   {/if}
 </main>
-
-<style>
-  :global(*) {
-    box-sizing: border-box;
-  }
-
-  :global(body) {
-    margin: 0;
-    min-width: 320px;
-    background: #f4f7fb;
-    color: #17202a;
-    font-family:
-      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-      "Segoe UI", sans-serif;
-  }
-
-  .page {
-    width: min(1440px, calc(100% - 32px));
-    margin: 0 auto;
-    padding: 20px 0 36px;
-  }
-
-  .topbar,
-  .nav-link,
-  button,
-  .panel-head,
-  .section-head,
-  .actions,
-  .pager {
-    display: flex;
-    align-items: center;
-  }
-
-  .topbar,
-  .section-head {
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-
-  .title {
-    flex: 1;
-  }
-
-  h1,
-  h2,
-  p {
-    margin: 0;
-  }
-
-  h1 {
-    font-size: 1.65rem;
-    letter-spacing: 0;
-  }
-
-  h2 {
-    font-size: 1rem;
-    letter-spacing: 0;
-  }
-
-  .eyebrow,
-  .hint,
-  label span,
-  .panel-head p,
-  .section-head p,
-  .metric span,
-  .object-row span,
-  .detail-grid span {
-    color: #667487;
-    font-size: 0.84rem;
-  }
-
-  .eyebrow {
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .panel,
-  .metric {
-    border: 1px solid #dbe3ee;
-    border-radius: 8px;
-    background: #fff;
-  }
-
-  button,
-  .nav-link {
-    justify-content: center;
-    gap: 8px;
-    min-height: 36px;
-    border: 1px solid #175cd3;
-    border-radius: 6px;
-    padding: 0 12px;
-    background: #175cd3;
-    color: #fff;
-    font: inherit;
-    font-size: 0.92rem;
-    font-weight: 750;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  .secondary,
-  .nav-link {
-    border-color: #cad2df;
-    background: #fff;
-    color: #263548;
-  }
-
-  .danger {
-    border-color: #b42318;
-    background: #b42318;
-  }
-
-  button:disabled {
-    cursor: progress;
-    opacity: 0.62;
-  }
-
-  .spin {
-    animation: spin 900ms linear infinite;
-  }
-
-  .notice {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 12px;
-    padding: 12px 14px;
-    border: 1px solid #f3b7b0;
-    border-radius: 8px;
-    background: #fff4f2;
-    color: #7c251f;
-  }
-
-  .summary,
-  .grid,
-  .object-grid,
-  .detail-grid,
-  .form-grid {
-    display: grid;
-    gap: 12px;
-  }
-
-  .summary {
-    grid-template-columns: 0.7fr 1fr 1fr 2fr;
-    margin-bottom: 12px;
-  }
-
-  .metric {
-    display: grid;
-    grid-template-columns: 22px 1fr;
-    gap: 4px 9px;
-    padding: 13px;
-    color: #175cd3;
-  }
-
-  .metric strong {
-    grid-column: 2;
-    min-width: 0;
-    color: #17202a;
-    font-size: 1.08rem;
-    line-height: 1.3;
-    overflow-wrap: anywhere;
-  }
-
-  .grid {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-    margin-bottom: 16px;
-  }
-
-  .editor,
-  .info,
-  .object-detail {
-    display: grid;
-    gap: 12px;
-    padding: 14px;
-  }
-
-  .panel-head {
-    justify-content: space-between;
-    gap: 10px;
-  }
-
-  .tag {
-    border-radius: 999px;
-    padding: 5px 9px;
-    background: #edf5ff;
-    color: #175cd3;
-    font-size: 0.78rem;
-    font-weight: 750;
-  }
-
-  .form-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  label {
-    display: grid;
-    gap: 6px;
-  }
-
-  .full {
-    grid-column: 1 / -1;
-  }
-
-  .check {
-    grid-template-columns: 18px 1fr;
-    align-items: center;
-    min-height: 36px;
-    gap: 8px;
-  }
-
-  input,
-  select,
-  textarea {
-    width: 100%;
-    min-height: 36px;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    padding: 8px 10px;
-    background: #fff;
-    color: #17202a;
-    font: inherit;
-  }
-
-  textarea {
-    resize: vertical;
-  }
-
-  input,
-  textarea {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  }
-
-  .actions,
-  .pager {
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .objects {
-    margin-top: 4px;
-  }
-
-  .object-grid {
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
-    align-items: start;
-  }
-
-  .object-list {
-    display: grid;
-    gap: 8px;
-  }
-
-  .object-row {
-    display: grid;
-    gap: 5px;
-    min-height: auto;
-    justify-content: stretch;
-    border-color: #dbe3ee;
-    padding: 11px;
-    background: #fff;
-    color: #17202a;
-    text-align: left;
-  }
-
-  .object-row.selected {
-    border-color: #175cd3;
-    background: #edf5ff;
-  }
-
-  .object-row strong,
-  .object-row span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .detail-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .detail-grid div {
-    border: 1px solid #edf1f5;
-    border-radius: 6px;
-    padding: 9px;
-    background: #f8fafc;
-  }
-
-  .detail-grid strong {
-    display: block;
-    margin-top: 3px;
-    overflow-wrap: anywhere;
-  }
-
-  .empty {
-    padding: 34px;
-    color: #667487;
-    text-align: center;
-  }
-
-  .toast {
-    position: fixed;
-    right: 18px;
-    bottom: 18px;
-    z-index: 20;
-    border: 1px solid #b7e4c7;
-    border-radius: 8px;
-    padding: 11px 13px;
-    background: #effaf3;
-    color: #1f7a43;
-    font-size: 0.9rem;
-    font-weight: 750;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @media (max-width: 1100px) {
-    .summary,
-    .grid,
-    .object-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .detail-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 680px) {
-    .page {
-      width: min(100% - 20px, 1440px);
-      padding-top: 14px;
-    }
-
-    .topbar,
-    .panel-head,
-    .section-head {
-      align-items: stretch;
-      flex-direction: column;
-    }
-
-    .summary,
-    .form-grid,
-    .detail-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>

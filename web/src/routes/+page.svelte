@@ -8,10 +8,14 @@
     Clipboard,
     Database,
     ExternalLink,
+    Filter,
+    Grid2X2,
     KeyRound,
     Layers3,
+    List,
     Plus,
     RefreshCw,
+    Search,
     Server,
     ShieldCheck,
     Sparkles,
@@ -36,6 +40,10 @@
   let origin = '';
   let adminTokenExpires = '';
   let copyMessage = '';
+  let cacheQuery = '';
+  let cacheVisibility = 'all';
+  let cacheView = 'cards';
+  let commandTab = 'client';
 
   const formatter = new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
@@ -173,7 +181,27 @@
     return values?.length ? values.join(', ') : '无';
   }
 
+  function matchesCache(cache) {
+    const query = cacheQuery.trim().toLowerCase();
+    const matchesQuery = !query || [
+      cache.name,
+      cache.store_dir,
+      cache.substituter_endpoint,
+      cache.api_endpoint,
+      cache.public_key,
+      ...(cache.upstream_cache_key_names ?? [])
+    ].some((value) => String(value ?? '').toLowerCase().includes(query));
+
+    const matchesVisibility =
+      cacheVisibility === 'all' ||
+      (cacheVisibility === 'public' && cache.is_public) ||
+      (cacheVisibility === 'private' && !cache.is_public);
+
+    return matchesQuery && matchesVisibility;
+  }
+
   $: caches = summary?.caches ?? [];
+  $: filteredCaches = caches.filter(matchesCache);
   $: publicCacheModel = caches.find((cache) => cache.is_public) || caches[0];
   $: exampleCache = caches[0]?.name || '<缓存名>';
   $: publicCache = publicCacheModel?.name || exampleCache;
@@ -194,6 +222,7 @@
     { value: substituterCommand, label: 'Substituter' },
     { value: trustedKeysCommand, label: 'Public key' }
   ];
+  $: activeCommands = commandTab === 'client' ? clientCommands : nixCommands;
 </script>
 
 <svelte:head>
@@ -259,74 +288,133 @@
     </article>
   </section>
 
-  <section class="toolbar panel">
+  <section class="hero-panel panel">
     <div>
-      <h2>缓存</h2>
-      <p>显示完整 endpoint、保留策略和上游 key。点击详情查看 store path 与 NAR 信息。</p>
+      <p class="eyebrow">Workspace</p>
+      <h2>缓存工作台</h2>
+      <p>搜索、筛选、复制 endpoint，或者进入详情查看 store path、NAR 与配置。</p>
     </div>
-    <div class="toolbar-actions">
-      <button class="secondary" type="button" on:click={() => copyText(substituterEndpoint, 'Substituter')}>
+    <div class="quick-actions">
+      <button type="button" on:click={() => copyText(substituterEndpoint, 'Substituter')}>
         <Clipboard size={16} />
-        <span>复制 substituter</span>
+        <span>Substituter</span>
       </button>
       <button class="secondary" type="button" on:click={() => copyText(publicKey, 'Public key')}>
         <Clipboard size={16} />
-        <span>复制 public key</span>
+        <span>Public key</span>
       </button>
     </div>
   </section>
 
-  <section class="cache-grid">
-    {#if caches.length}
-      {#each caches as cache}
-        <article class="cache-card panel">
-          <div class="cache-head">
-            <div>
-              <h3>{cache.name}</h3>
-              <p>{cache.store_dir}</p>
-            </div>
-            <span class="tag">{cache.is_public ? '公开' : '私有'} · P{cache.priority}</span>
-          </div>
-          <div class="facts">
-            <div><span>对象</span><strong>{cache.objects}</strong></div>
-            <div><span>保留</span><strong>{formatRetention(cache.retention_period)}</strong></div>
-            <div><span>创建</span><strong>{formatDate(cache.created_at)}</strong></div>
-          </div>
-          <div class="field">
-            <span>Substituter</span>
-            <code>{cache.substituter_endpoint}</code>
-          </div>
-          <div class="field">
-            <span>API Endpoint</span>
-            <code>{cache.api_endpoint}</code>
-          </div>
-          <div class="field">
-            <span>Upstream keys</span>
-            <code>{joinList(cache.upstream_cache_key_names)}</code>
-          </div>
-          <div class="field">
-            <span>Public key</span>
-            <code>{cache.public_key}</code>
-          </div>
-          <div class="card-actions">
-            <a class="nav-link primary-link" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
-              <ExternalLink size={16} />
-              <span>详情</span>
-            </a>
-            <button class="secondary" type="button" on:click={() => copyText(cache.public_key, 'Public key')}>
-              <Clipboard size={16} />
-              <span>复制 key</span>
-            </button>
-          </div>
-        </article>
-      {/each}
-    {:else}
-      <div class="empty panel">{loading ? '正在加载缓存...' : '还没有创建缓存。'}</div>
-    {/if}
-  </section>
+  <section class="console-layout">
+    <section class="main-column">
+      <section class="panel cache-toolbar">
+        <label class="search-field">
+          <Search size={16} />
+          <input bind:value={cacheQuery} placeholder="搜索缓存、endpoint、public key" autocomplete="off" />
+        </label>
+        <div class="segmented" aria-label="缓存可见性">
+          <button class:active={cacheVisibility === 'all'} class="secondary" type="button" on:click={() => cacheVisibility = 'all'}>
+            <Filter size={15} />
+            <span>全部</span>
+          </button>
+          <button class:active={cacheVisibility === 'public'} class="secondary" type="button" on:click={() => cacheVisibility = 'public'}>公开</button>
+          <button class:active={cacheVisibility === 'private'} class="secondary" type="button" on:click={() => cacheVisibility = 'private'}>私有</button>
+        </div>
+        <div class="segmented compact" aria-label="缓存视图">
+          <button class:active={cacheView === 'cards'} class="secondary" type="button" title="卡片视图" on:click={() => cacheView = 'cards'}>
+            <Grid2X2 size={15} />
+          </button>
+          <button class:active={cacheView === 'table'} class="secondary" type="button" title="表格视图" on:click={() => cacheView = 'table'}>
+            <List size={15} />
+          </button>
+        </div>
+      </section>
 
-  <section class="workspace">
-    <section class="panel control-card">
+      {#if cacheView === 'cards'}
+        <section class="cache-grid">
+          {#if filteredCaches.length}
+            {#each filteredCaches as cache}
+              <article class="cache-card panel">
+                <div class="cache-head">
+                  <div>
+                    <h3>{cache.name}</h3>
+                    <p>{cache.store_dir}</p>
+                  </div>
+                  <span class:private={!cache.is_public} class="tag">{cache.is_public ? '公开' : '私有'} · P{cache.priority}</span>
+                </div>
+                <div class="facts">
+                  <div><span>对象</span><strong>{cache.objects}</strong></div>
+                  <div><span>保留</span><strong>{formatRetention(cache.retention_period)}</strong></div>
+                  <div><span>创建</span><strong>{formatDate(cache.created_at)}</strong></div>
+                </div>
+                <div class="field">
+                  <span>Substituter</span>
+                  <code>{cache.substituter_endpoint}</code>
+                </div>
+                <div class="field">
+                  <span>Public key</span>
+                  <code>{cache.public_key}</code>
+                </div>
+                <div class="card-actions">
+                  <a class="nav-link primary-link" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
+                    <ExternalLink size={16} />
+                    <span>详情</span>
+                  </a>
+                  <button class="secondary" type="button" on:click={() => copyText(cache.substituter_endpoint, 'Substituter')}>
+                    <Clipboard size={16} />
+                    <span>地址</span>
+                  </button>
+                  <button class="secondary" type="button" on:click={() => copyText(cache.public_key, 'Public key')}>
+                    <Clipboard size={16} />
+                    <span>Key</span>
+                  </button>
+                </div>
+              </article>
+            {/each}
+          {:else}
+            <div class="empty panel">{loading ? '正在加载缓存...' : '没有匹配的缓存。'}</div>
+          {/if}
+        </section>
+      {:else}
+        <section class="panel cache-table-wrap">
+          <table class="cache-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>状态</th>
+                <th>对象</th>
+                <th>保留</th>
+                <th>Substituter</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each filteredCaches as cache}
+                <tr>
+                  <td><strong>{cache.name}</strong><span>{cache.store_dir}</span></td>
+                  <td><span class:private={!cache.is_public} class="tag">{cache.is_public ? '公开' : '私有'} · P{cache.priority}</span></td>
+                  <td>{cache.objects}</td>
+                  <td>{formatRetention(cache.retention_period)}</td>
+                  <td><code>{cache.substituter_endpoint}</code></td>
+                  <td>
+                    <a class="nav-link primary-link" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
+                      <ExternalLink size={15} />
+                    </a>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          {#if !filteredCaches.length}
+            <div class="empty">{loading ? '正在加载缓存...' : '没有匹配的缓存。'}</div>
+          {/if}
+        </section>
+      {/if}
+    </section>
+
+    <aside class="side-column">
+      <section class="panel control-card token-card">
       <div class="panel-head compact">
         <div>
           <h2>管理员 Token</h2>
@@ -348,9 +436,9 @@
           <span>复制</span>
         </button>
       </div>
-    </section>
+      </section>
 
-    <section class="panel control-card">
+      <section class="panel control-card">
       <div class="panel-head compact">
         <div>
           <h2>创建缓存</h2>
@@ -383,19 +471,29 @@
       {#if createMessage}
         <p class="hint">{createMessage}</p>
       {/if}
-    </section>
+      </section>
+    </aside>
   </section>
 
-  <section class="command-grid">
-    <article class="panel command-card">
+  <section class="panel command-dock">
       <div class="panel-head compact">
         <div>
-          <h2>客户端命令</h2>
-          <p>登录、启用缓存并推送 store path。</p>
+          <h2>命令面板</h2>
+          <p>{commandTab === 'client' ? '登录、启用缓存并推送 store path。' : '公开缓存可直接作为 substituter。'}</p>
         </div>
-        <Terminal size={20} />
+        <div class="segmented">
+          <button class:active={commandTab === 'client'} class="secondary" type="button" on:click={() => commandTab = 'client'}>
+            <Terminal size={15} />
+            <span>客户端</span>
+          </button>
+          <button class:active={commandTab === 'nix'} class="secondary" type="button" on:click={() => commandTab = 'nix'}>
+            <ShieldCheck size={15} />
+            <span>Nix</span>
+          </button>
+        </div>
       </div>
-      {#each clientCommands as command}
+      <div class="command-list">
+      {#each activeCommands as command}
         <div class="code-line">
           <code>{command.value}</code>
           <button class="icon-button" type="button" title={`复制${command.label}`} on:click={() => copyText(command.value, command.label)}>
@@ -403,470 +501,10 @@
           </button>
         </div>
       {/each}
-    </article>
-
-    <article class="panel command-card">
-      <div class="panel-head compact">
-        <div>
-          <h2>Nix 配置</h2>
-          <p>公开缓存可直接作为 substituter。</p>
-        </div>
-        <ShieldCheck size={20} />
       </div>
-      {#each nixCommands as command}
-        <div class="code-line">
-          <code>{command.value}</code>
-          <button class="icon-button" type="button" title={`复制${command.label}`} on:click={() => copyText(command.value, command.label)}>
-            <Clipboard size={15} />
-          </button>
-        </div>
-      {/each}
-    </article>
   </section>
 
   {#if copyMessage}
     <div class="toast">{copyMessage}</div>
   {/if}
 </main>
-
-<style>
-  :global(*) {
-    box-sizing: border-box;
-  }
-
-  :global(body) {
-    margin: 0;
-    min-width: 320px;
-    background: #f4f7fb;
-    color: #17202a;
-    font-family:
-      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-      "Segoe UI", sans-serif;
-  }
-
-  .app {
-    width: min(1440px, calc(100% - 32px));
-    margin: 0 auto;
-    padding: 20px 0 36px;
-  }
-
-  .topbar,
-  .brand,
-  .top-actions,
-  button,
-  .status-pill,
-  .nav-link,
-  a {
-    display: flex;
-    align-items: center;
-  }
-
-  .topbar {
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 14px;
-  }
-
-  .brand,
-  .top-actions,
-  .toolbar-actions,
-  .card-actions {
-    gap: 10px;
-  }
-
-  .brand-mark {
-    display: grid;
-    place-items: center;
-    width: 42px;
-    height: 42px;
-    border: 1px solid #c8d7ea;
-    border-radius: 8px;
-    background: #ffffff;
-    color: #175cd3;
-  }
-
-  h1,
-  h2,
-  h3,
-  p {
-    margin: 0;
-  }
-
-  h1 {
-    margin-top: 2px;
-    font-size: 1.7rem;
-    letter-spacing: 0;
-  }
-
-  h2 {
-    font-size: 1rem;
-    letter-spacing: 0;
-  }
-
-  h3 {
-    font-size: 1.08rem;
-    letter-spacing: 0;
-  }
-
-  .eyebrow,
-  .hint,
-  label span,
-  .panel-head p,
-  .cache-card p,
-  .field span,
-  .metric span,
-  .facts span {
-    color: #667487;
-    font-size: 0.84rem;
-  }
-
-  .eyebrow {
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .panel,
-  .metric {
-    border: 1px solid #dbe3ee;
-    border-radius: 8px;
-    background: #fff;
-  }
-
-  button,
-  .nav-link {
-    justify-content: center;
-    gap: 8px;
-    min-height: 36px;
-    border: 1px solid #175cd3;
-    border-radius: 6px;
-    padding: 0 12px;
-    background: #175cd3;
-    color: #fff;
-    font: inherit;
-    font-size: 0.92rem;
-    font-weight: 750;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  .secondary,
-  .nav-link {
-    border-color: #cad2df;
-    background: #fff;
-    color: #263548;
-  }
-
-  .primary-link {
-    border-color: #175cd3;
-    background: #175cd3;
-    color: #fff;
-  }
-
-  button:disabled {
-    cursor: progress;
-    opacity: 0.72;
-  }
-
-  .icon-button {
-    width: 32px;
-    min-height: 32px;
-    flex: 0 0 auto;
-    padding: 0;
-  }
-
-  .status-pill {
-    gap: 7px;
-    min-height: 36px;
-    border: 1px solid #d5dde8;
-    border-radius: 999px;
-    padding: 0 12px;
-    background: #fff;
-    color: #5c6878;
-    font-size: 0.9rem;
-    font-weight: 750;
-  }
-
-  .status-pill.online {
-    border-color: #b7e4c7;
-    color: #1f7a43;
-  }
-
-  .spin {
-    animation: spin 900ms linear infinite;
-  }
-
-  .notice {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 12px;
-    padding: 12px 14px;
-    border: 1px solid #f3b7b0;
-    border-radius: 8px;
-    background: #fff4f2;
-    color: #7c251f;
-  }
-
-  .notice span {
-    display: block;
-    margin-top: 3px;
-    font-size: 0.9rem;
-  }
-
-  .metrics,
-  .cache-grid,
-  .workspace,
-  .command-grid {
-    display: grid;
-    gap: 12px;
-  }
-
-  .metrics {
-    grid-template-columns: 0.7fr 0.7fr 1fr 1.6fr;
-    margin-bottom: 12px;
-  }
-
-  .metric {
-    display: grid;
-    grid-template-columns: 22px 1fr;
-    gap: 4px 9px;
-    padding: 13px;
-    color: #175cd3;
-  }
-
-  .metric strong {
-    grid-column: 2;
-    min-width: 0;
-    color: #17202a;
-    font-size: 1.25rem;
-    line-height: 1.25;
-    overflow-wrap: anywhere;
-  }
-
-  .toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-    padding: 14px;
-  }
-
-  .toolbar p {
-    margin-top: 4px;
-    color: #667487;
-    font-size: 0.9rem;
-  }
-
-  .toolbar-actions,
-  .card-actions {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .cache-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-bottom: 12px;
-  }
-
-  .cache-card,
-  .control-card,
-  .command-card {
-    display: grid;
-    gap: 12px;
-    padding: 14px;
-  }
-
-  .cache-head,
-  .panel-head,
-  .code-line {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 10px;
-  }
-
-  .tag {
-    display: inline-flex;
-    flex: 0 0 auto;
-    border-radius: 999px;
-    padding: 5px 9px;
-    background: #edf5ff;
-    color: #175cd3;
-    font-size: 0.78rem;
-    font-weight: 750;
-  }
-
-  .facts {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .facts div {
-    border: 1px solid #edf1f5;
-    border-radius: 6px;
-    padding: 9px;
-    background: #f8fafc;
-  }
-
-  .facts strong {
-    display: block;
-    margin-top: 3px;
-    overflow-wrap: anywhere;
-  }
-
-  .field {
-    display: grid;
-    gap: 5px;
-  }
-
-  code,
-  input {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  }
-
-  .field code,
-  .code-line code,
-  .wrap-code {
-    display: block;
-    min-width: 0;
-    border-radius: 6px;
-    background: #f3f6fa;
-    color: #263548;
-    font-size: 0.79rem;
-    line-height: 1.45;
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
-  }
-
-  .field code,
-  .code-line code,
-  .wrap-code {
-    padding: 9px 10px;
-  }
-
-  .workspace,
-  .command-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 12px;
-  }
-
-  label {
-    display: grid;
-    gap: 6px;
-  }
-
-  input {
-    width: 100%;
-    min-height: 36px;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    padding: 8px 10px;
-    background: #fff;
-    color: #17202a;
-    font: inherit;
-  }
-
-  input:focus {
-    border-color: #175cd3;
-    outline: 3px solid rgba(23, 92, 211, 0.14);
-  }
-
-  .button-row,
-  .split {
-    display: grid;
-    gap: 10px;
-  }
-
-  .button-row {
-    grid-template-columns: 1fr 108px;
-  }
-
-  .split {
-    grid-template-columns: 1fr 96px;
-    align-items: end;
-  }
-
-  .check {
-    grid-template-columns: 18px 1fr;
-    align-items: center;
-    min-height: 36px;
-    gap: 8px;
-  }
-
-  .check input {
-    min-height: auto;
-  }
-
-  .code-line {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 32px;
-    align-items: center;
-  }
-
-  .empty {
-    padding: 34px;
-    color: #667487;
-    text-align: center;
-  }
-
-  .toast {
-    position: fixed;
-    right: 18px;
-    bottom: 18px;
-    z-index: 20;
-    border: 1px solid #b7e4c7;
-    border-radius: 8px;
-    padding: 11px 13px;
-    background: #effaf3;
-    color: #1f7a43;
-    font-size: 0.9rem;
-    font-weight: 750;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @media (max-width: 1100px) {
-    .metrics,
-    .cache-grid,
-    .workspace,
-    .command-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .metrics {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 680px) {
-    .app {
-      width: min(100% - 20px, 1440px);
-      padding-top: 14px;
-    }
-
-    .topbar,
-    .top-actions,
-    .toolbar,
-    .panel-head,
-    .cache-head {
-      align-items: stretch;
-      flex-direction: column;
-    }
-
-    .metrics,
-    .facts,
-    .button-row,
-    .split {
-      grid-template-columns: 1fr;
-    }
-
-    h1 {
-      font-size: 1.45rem;
-    }
-  }
-</style>
