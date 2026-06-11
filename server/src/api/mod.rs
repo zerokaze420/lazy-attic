@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use axum::{
     response::Html,
-    routing::{get, post},
+    routing::{get, patch, post},
     Router,
 };
 use tower_http::services::{ServeDir, ServeFile};
@@ -27,11 +27,25 @@ pub(crate) fn get_router() -> Router {
         .merge(binary_cache::get_router())
         .merge(v1::get_router())
         .route("/_api/web/summary", get(console::summary))
-        .route("/_api/web/admin-token", post(console::admin_token));
+        .route("/_api/web/admin-token", post(console::admin_token))
+        .route(
+            "/_api/web/caches/:cache/objects",
+            get(console::list_objects),
+        )
+        .route(
+            "/_api/web/caches/:cache/objects/:store_path_hash",
+            get(console::object_detail),
+        )
+        .route(
+            "/_api/web/caches/:cache/config",
+            patch(v1::cache_config::configure_cache).delete(v1::cache_config::destroy_cache),
+        );
 
     if let Some(web_dir) = web_dir() {
         router
             .route_service("/", ServeFile::new(web_dir.join("index.html")))
+            .route_service("/cache", ServeFile::new(web_dir.join("cache/index.html")))
+            .route_service("/cache/", ServeFile::new(web_dir.join("cache/index.html")))
             .route_service("/guide", ServeFile::new(web_dir.join("guide/index.html")))
             .route_service("/guide/", ServeFile::new(web_dir.join("guide/index.html")))
             .nest_service("/_app", ServeDir::new(web_dir.join("_app")))

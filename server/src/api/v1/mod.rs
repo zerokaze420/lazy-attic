@@ -1,4 +1,4 @@
-mod cache_config;
+pub(crate) mod cache_config;
 mod get_missing_paths;
 mod upload_path;
 
