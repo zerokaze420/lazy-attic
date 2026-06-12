@@ -7,31 +7,25 @@
     CheckCircle2,
     Clipboard,
     ExternalLink,
-    FileSearch,
     Info,
     RefreshCw,
     Save,
-    Search,
     Settings2,
     ShieldCheck,
     Trash2
   } from '@lucide/svelte';
-  import InfoBlock from './InfoBlock.svelte';
   import InfoLine from './InfoLine.svelte';
 
   let cacheName = '';
   let token = '';
-  let payload = null;
-  let selected = null;
+  let cache = null;
+  let usage = null;
   let loading = true;
   let busy = false;
   let error = '';
   let message = '';
   let copyMessage = '';
-  let offset = 0;
-  let objectQuery = '';
   let configTab = 'settings';
-  const limit = 12;
 
   let edit = {
     isPublic: true,
@@ -53,10 +47,10 @@
   onMount(() => {
     cacheName = new URLSearchParams(location.search).get('name') || '';
     token = localStorage.getItem('attic.console.token') ?? '';
-    loadObjects();
+    loadData();
   });
 
-  async function loadObjects(nextOffset = offset) {
+  async function loadData() {
     if (!cacheName) {
       error = '缺少缓存名称。';
       loading = false;
@@ -65,19 +59,31 @@
 
     loading = true;
     error = '';
-    offset = Math.max(0, nextOffset);
 
     try {
-      const response = await fetch(
-        `/_api/web/caches/${encodeURIComponent(cacheName)}/objects?limit=${limit}&offset=${offset}`
-      );
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `HTTP ${response.status}`);
+      const [summaryRes, usageRes] = await Promise.all([
+        fetch('/_api/web/summary'),
+        fetch('/_api/web/usage')
+      ]);
+
+      if (!summaryRes.ok) {
+        const text = await summaryRes.text();
+        throw new Error(text || `HTTP ${summaryRes.status}`);
       }
-      payload = await response.json();
-      selected = payload.objects[0] ?? null;
-      syncEdit(payload.cache);
+      if (!usageRes.ok) {
+        const text = await usageRes.text();
+        throw new Error(text || `HTTP ${usageRes.status}`);
+      }
+
+      const summary = await summaryRes.json();
+      const usagePayload = await usageRes.json();
+
+      cache = summary.caches.find((c) => c.name === cacheName) ?? null;
+      if (!cache) throw new Error(`缓存 "${cacheName}" 不存在`);
+
+      usage = usagePayload.cache_usage.find((u) => u.cache.name === cacheName) ?? null;
+
+      syncEdit(cache);
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -85,14 +91,14 @@
     }
   }
 
-  function syncEdit(cache) {
+  function syncEdit(c) {
     edit = {
-      isPublic: cache.is_public,
-      storeDir: cache.store_dir,
-      priority: cache.priority,
-      upstream: (cache.upstream_cache_key_names ?? []).join('\n'),
-      retentionMode: cache.retention_period === null || cache.retention_period === undefined ? 'global' : 'period',
-      retentionSeconds: cache.retention_period ?? 0
+      isPublic: c.is_public,
+      storeDir: c.store_dir,
+      priority: c.priority,
+      upstream: (c.upstream_cache_key_names ?? []).join('\n'),
+      retentionMode: c.retention_period === null || c.retention_period === undefined ? 'global' : 'period',
+      retentionSeconds: c.retention_period ?? 0
     };
   }
 
@@ -128,7 +134,7 @@
         throw new Error(text || `HTTP ${response.status}`);
       }
       message = '缓存配置已保存。';
-      await loadObjects(offset);
+      await loadData();
     } catch (err) {
       message = err instanceof Error ? err.message : String(err);
     } finally {
@@ -191,24 +197,8 @@
     return days >= 1 ? `${days} 天` : `${Math.max(1, Math.round(seconds / 3600))} 小时`;
   }
 
-  function matchesObject(object) {
-    const query = objectQuery.trim().toLowerCase();
-    if (!query) return true;
-    return [
-      object.store_path, object.store_path_hash, object.system,
-      object.created_by, object.deriver, object.ca,
-      object.nar?.nar_hash,
-      ...(object.references ?? []),
-      ...(object.sigs ?? [])
-    ].some((v) => String(v ?? '').toLowerCase().includes(query));
-  }
-
-  $: cache = payload?.cache;
-  $: objects = payload?.objects ?? [];
-  $: visibleObjects = objects.filter(matchesObject);
-  $: total = payload?.total ?? 0;
-  $: hasPrev = offset > 0;
-  $: hasNext = offset + limit < total;
+  $: maxSysCount = usage?.systems?.length ? Math.max(...usage.systems.map(s => s.count)) : 1;
+  $: maxCompCount = usage?.compressions?.length ? Math.max(...usage.compressions.map(c => c.count)) : 1;
 </script>
 
 <svelte:head>
@@ -222,11 +212,11 @@
         <ArrowLeft size={16} />
       </a>
       <div>
-        <h1 class="page-title">{cacheName || 'Cache Detail'}</h1>
-        <p class="page-description">Cache Detail</p>
+        <h1 class="page-title">{cacheName || '缓存详情'}</h1>
+        <p class="page-description">{cache?.store_dir ?? 'Nix Store'}</p>
       </div>
     </div>
-    <button class="btn btn-secondary" type="button" on:click={() => loadObjects(offset)} disabled={loading}>
+    <button class="btn btn-secondary" type="button" on:click={loadData} disabled={loading}>
       <span class:spin={loading}><RefreshCw size={15} /></span>
       <span>刷新</span>
     </button>
@@ -246,30 +236,46 @@
       <div class="stat-card">
         <div class="stat-icon"><Box size={18} /></div>
         <div class="stat-content">
-          <span class="stat-label">Objects</span>
+          <span class="stat-label">对象数</span>
           <span class="stat-value">{cache.objects}</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon"><ShieldCheck size={18} /></div>
         <div class="stat-content">
-          <span class="stat-label">Status</span>
+          <span class="stat-label">状态</span>
           <span class="stat-value">{cache.is_public ? '公开' : '私有'} · P{cache.priority}</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon"><CheckCircle2 size={18} /></div>
         <div class="stat-content">
-          <span class="stat-label">Retention</span>
+          <span class="stat-label">保留策略</span>
           <span class="stat-value">{formatRetention(cache.retention_period)}</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon"><ExternalLink size={18} /></div>
         <div class="stat-content">
-          <span class="stat-label">Substituter</span>
-          <span class="stat-value" style="font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px;">{cache.substituter_endpoint}</span>
+          <span class="stat-label">最后上传</span>
+          <span class="stat-value" style="font-size:0.82rem;">{usage ? formatDate(usage.last_upload_at) : '-'}</span>
         </div>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-top:8px;">
+      <div class="stat-card" style="grid-column:1/-1;">
+        <div class="stat-content" style="width:100%;">
+          <span class="stat-label">NAR 存储量</span>
+          <span class="stat-value" style="font-size:1.4rem;">{usage ? formatBytes(usage.nar_size) : '-'}</span>
+        </div>
+        {#if usage}
+          <div style="margin-top:8px;height:8px;background:hsl(var(--muted));border-radius:4px;overflow:hidden;">
+            <div
+              style="height:100%;background:linear-gradient(90deg,hsl(var(--primary)),hsl(var(--ring)));border-radius:4px;transition:width .4s;"
+            ></div>
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -347,84 +353,74 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <h2>Store paths</h2>
-          <p>当前页 {visibleObjects.length} / {objects.length}，全量 {total}。</p>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div class="search-wrapper" style="width:260px;">
-            <Search size={14} />
-            <input class="input" bind:value={objectQuery} placeholder="搜索 store path、hash..." autocomplete="off" />
+    {#if usage}
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>存储与健康状况</h2>
+            <p>缓存整体健康度与分布</p>
           </div>
-          <button class="btn btn-secondary btn-sm" type="button" disabled={!hasPrev || loading} on:click={() => loadObjects(offset - limit)}>上一页</button>
-          <button class="btn btn-secondary btn-sm" type="button" disabled={!hasNext || loading} on:click={() => loadObjects(offset + limit)}>下一页</button>
         </div>
-      </div>
-      <div class="card-body no-padding">
-        <div class="object-layout">
-          <div class="object-list-panel">
-            {#if visibleObjects.length}
-              {#each visibleObjects as object}
-                <button
-                  class="object-item"
-                  class:active={selected?.store_path_hash === object.store_path_hash}
-                  type="button"
-                  on:click={() => selected = object}
-                >
-                  <strong>{object.store_path}</strong>
-                  <span>{object.system || 'unknown'} · {formatBytes(object.nar.nar_size)} · {formatDate(object.created_at)}</span>
-                </button>
+        <div class="card-body">
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span>最后上传</span>
+              <strong>{formatDate(usage.last_upload_at)}</strong>
+            </div>
+            <div class="detail-item">
+              <span>最后访问</span>
+              <strong>{formatDate(usage.last_accessed_at)}</strong>
+            </div>
+            <div class="detail-item">
+              <span>不完整对象</span>
+              <strong>{usage.incomplete_objects} / {cache.objects}</strong>
+            </div>
+            <div class="detail-item">
+              <span>从未访问</span>
+              <strong>{usage.never_accessed_objects} / {cache.objects}</strong>
+            </div>
+          </div>
+
+          {#if usage.systems?.length}
+            <h3 style="font-size:0.9rem;margin:20px 0 8px;font-weight:600;">系统架构分布</h3>
+            <div class="breakdown-list">
+              {#each usage.systems as sys}
+                <div class="breakdown-row">
+                  <div class="breakdown-row-label">
+                    <span class="badge badge-default">{sys.name}</span>
+                  </div>
+                  <div class="breakdown-bar-track">
+                    <div class="breakdown-bar" style="width:{(sys.count / maxSysCount) * 100}%"></div>
+                  </div>
+                  <div class="breakdown-row-value">
+                    {sys.count} 个 · {formatBytes(sys.nar_size)}
+                  </div>
+                </div>
               {/each}
-            {:else}
-              <div class="empty">{loading ? '正在加载对象...' : '没有匹配的 store path。'}</div>
-            {/if}
-          </div>
+            </div>
+          {/if}
 
-          <div class="object-detail-panel">
-            {#if selected}
-              <div class="card">
-                <div class="card-header">
-                  <div>
-                    <h2>对象详情</h2>
-                    <p>{selected.store_path_hash}</p>
+          {#if usage.compressions?.length}
+            <h3 style="font-size:0.9rem;margin:20px 0 8px;font-weight:600;">压缩方式分布</h3>
+            <div class="breakdown-list">
+              {#each usage.compressions as comp}
+                <div class="breakdown-row">
+                  <div class="breakdown-row-label">
+                    <span class="badge badge-default">{comp.name}</span>
                   </div>
-                  <button class="btn btn-secondary btn-sm" type="button" on:click={() => copyText(selected.store_path, 'Store path')}>
-                    <Clipboard size={14} />
-                    <span>复制路径</span>
-                  </button>
-                </div>
-                <div class="card-body">
-                  <InfoLine label="Store path" value={selected.store_path} oncopy={copyText} />
-                  <InfoLine label="Narinfo" value={selected.narinfo_url} oncopy={copyText} />
-                  <InfoLine label="NAR URL" value={selected.nar_url} oncopy={copyText} />
-
-                  <div class="detail-grid" style="margin-top:12px;">
-                    <div class="detail-item"><span>System</span><strong>{selected.system || '-'}</strong></div>
-                    <div class="detail-item"><span>上传者</span><strong>{selected.created_by || '-'}</strong></div>
-                    <div class="detail-item"><span>创建时间</span><strong>{formatDate(selected.created_at)}</strong></div>
-                    <div class="detail-item"><span>最后访问</span><strong>{formatDate(selected.last_accessed_at)}</strong></div>
-                    <div class="detail-item"><span>NAR 大小</span><strong>{formatBytes(selected.nar.nar_size)}</strong></div>
-                    <div class="detail-item"><span>压缩</span><strong>{selected.nar.compression}</strong></div>
-                    <div class="detail-item"><span>分块</span><strong>{selected.nar.num_chunks}</strong></div>
-                    <div class="detail-item"><span>完整</span><strong>{selected.nar.completeness_hint ? '是' : '否'}</strong></div>
+                  <div class="breakdown-bar-track">
+                    <div class="breakdown-bar" style="width:{(comp.count / maxCompCount) * 100}%"></div>
                   </div>
-
-                  <InfoBlock label="NAR hash" value={selected.nar.nar_hash} />
-                  <InfoBlock label="Deriver" value={selected.deriver || '-'} />
-                  <InfoBlock label="Content address" value={selected.ca || '-'} />
-                  <InfoBlock label="References" value={selected.references.length ? selected.references.join('\n') : '无'} />
-                  <InfoBlock label="Signatures" value={selected.sigs.length ? selected.sigs.join('\n') : '无'} />
+                  <div class="breakdown-row-value">
+                    {comp.count} 个 · {formatBytes(comp.nar_size)}
+                  </div>
                 </div>
-              </div>
-            {:else}
-              <div class="empty">选择左侧对象查看详情</div>
-            {/if}
-          </div>
+              {/each}
+            </div>
+          {/if}
         </div>
       </div>
-    </div>
+    {/if}
   {:else if loading}
     <div class="empty">正在加载缓存详情...</div>
   {/if}
@@ -433,3 +429,37 @@
 {#if copyMessage}
   <div class="toast">{copyMessage}</div>
 {/if}
+
+<style>
+  .breakdown-list {
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .breakdown-row {
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    align-items:center;
+    gap:12px;
+  }
+  .breakdown-row-label {
+    min-width:140px;
+  }
+  .breakdown-bar-track {
+    height:10px;
+    background:hsl(var(--muted));
+    border-radius:5px;
+    overflow:hidden;
+  }
+  .breakdown-bar {
+    height:100%;
+    background:linear-gradient(90deg,hsl(var(--primary)),hsl(var(--ring)));
+    border-radius:5px;
+    transition:width .4s ease;
+  }
+  .breakdown-row-value {
+    font-size:0.8rem;
+    color:hsl(var(--muted-foreground));
+    white-space:nowrap;
+  }
+</style>
