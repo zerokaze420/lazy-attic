@@ -18,6 +18,7 @@
     Sparkles,
     Terminal
   } from '@lucide/svelte';
+  import { t, formatDate, formatBytes, formatRetention } from '$lib/i18n/index.svelte';
 
   const defaultCreate = {
     name: '',
@@ -42,14 +43,6 @@
   let cacheVisibility = 'all';
   let cacheView = 'cards';
   let commandTab = 'client';
-
-  const formatter = new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
 
   onMount(() => {
     origin = location.origin;
@@ -92,7 +85,7 @@
       token = payload.token;
       adminTokenExpires = payload.expires_at;
       localStorage.setItem('attic.console.token', token);
-      createMessage = `管理员 Token 已生成，有效期至 ${formatDate(payload.expires_at)}。`;
+      createMessage = t('dash.tokenGenerated', { date: formatDate(payload.expires_at) });
     } catch (err) {
       createMessage = err instanceof Error ? err.message : String(err);
     } finally {
@@ -105,8 +98,8 @@
     createMessage = '';
     try {
       const name = create.name.trim();
-      if (!name) throw new Error('请输入缓存名称。');
-      if (!token.trim()) throw new Error('请先填写管理员 Token。');
+      if (!name) throw new Error(t('dash.needName'));
+      if (!token.trim()) throw new Error(t('dash.needToken'));
       const response = await fetch(`/_api/v1/cache-config/${encodeURIComponent(name)}`, {
         method: 'POST',
         headers: {
@@ -126,7 +119,7 @@
         throw new Error(text || `HTTP ${response.status}`);
       }
       create = { ...defaultCreate };
-      createMessage = `缓存 "${name}" 已创建。`;
+      createMessage = t('dash.cacheCreated', { name });
       await refresh();
     } catch (err) {
       createMessage = err instanceof Error ? err.message : String(err);
@@ -138,32 +131,8 @@
   async function copyText(value, label) {
     if (!value || value.startsWith('<')) return;
     await navigator.clipboard.writeText(value);
-    copyMessage = `${label} 已复制`;
+    copyMessage = t('copied');
     setTimeout(() => { copyMessage = ''; }, 1800);
-  }
-
-  function formatDate(value) {
-    return formatter.format(new Date(value));
-  }
-
-  function formatRetention(seconds) {
-    if (seconds === null || seconds === undefined) return '全局默认';
-    if (seconds === 0) return '永久保留';
-    const days = Math.round(seconds / 86400);
-    if (days >= 1) return `${days} 天`;
-    return `${Math.round(seconds / 3600) || 1} 小时`;
-  }
-
-  function formatBytes(value) {
-    if (!Number.isFinite(value)) return '-';
-    const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
-    let size = Math.max(0, value);
-    let unit = 0;
-    while (size >= 1024 && unit < units.length - 1) {
-      size /= 1024;
-      unit += 1;
-    }
-    return `${size >= 10 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
   }
 
   function matchesCache(cache) {
@@ -183,9 +152,9 @@
   $: caches = summary?.caches ?? [];
   $: filteredCaches = caches.filter(matchesCache);
   $: publicCacheModel = caches.find((c) => c.is_public) || caches[0];
-  $: exampleCache = caches[0]?.name || '<缓存名>';
+  $: exampleCache = caches[0]?.name || '<cache-name>';
   $: publicCache = publicCacheModel?.name || exampleCache;
-  $: publicKey = publicCacheModel?.public_key || '<缓存公钥>';
+  $: publicKey = publicCacheModel?.public_key || '<public-key>';
   $: latestUsage = usage?.cache_usage?.[0]?.nar_size ?? 0;
   $: apiEndpoint = publicCacheModel?.api_endpoint || `${origin}/`;
   $: substituterEndpoint = publicCacheModel?.substituter_endpoint || `${origin}/${publicCache}`;
@@ -195,8 +164,8 @@
   $: substituterCommand = `substituters = ${substituterEndpoint}`;
   $: trustedKeysCommand = `trusted-public-keys = ${publicKey}`;
   $: activeCommands = commandTab === 'client'
-    ? [{ value: loginCommand, label: '登录命令' }, { value: useCommand, label: '启用命令' }, { value: pushCommand, label: '推送命令' }]
-    : [{ value: substituterCommand, label: 'Substituter' }, { value: trustedKeysCommand, label: 'Public key' }];
+    ? [{ value: loginCommand, label: t('dash.loginCommand') }, { value: useCommand, label: t('dash.useCommand') }, { value: pushCommand, label: t('dash.pushCommand') }]
+    : [{ value: substituterCommand, label: t('substituter') }, { value: trustedKeysCommand, label: t('publicKey') }];
 </script>
 
 <svelte:head>
@@ -206,17 +175,17 @@
 <div class="page-header">
   <div style="display:flex;align-items:center;justify-content:space-between;">
     <div>
-      <h1 class="page-title">Dashboard</h1>
-      <p class="page-description">管理 Nix 二进制缓存，复制 substituter 配置，并查看存储使用趋势。</p>
+      <h1 class="page-title">{t('dash.title')}</h1>
+      <p class="page-description">{t('dash.description')}</p>
     </div>
     <div style="display:flex;gap:8px;">
       <a class="btn btn-secondary" href="/guide">
         <BookOpen size={15} />
-        <span>Guide</span>
+        <span>{t('sidebar.guide')}</span>
       </a>
       <button class="btn btn-secondary" on:click={refresh} disabled={loading}>
         <span class:spin={loading}><RefreshCw size={15} /></span>
-        <span>Refresh</span>
+        <span>{t('refresh')}</span>
       </button>
     </div>
   </div>
@@ -234,28 +203,28 @@
     <div class="stat-card">
       <div class="stat-icon"><Database size={18} /></div>
       <div class="stat-content">
-        <span class="stat-label">Caches</span>
+        <span class="stat-label">{t('dash.caches')}</span>
         <span class="stat-value">{summary?.counts?.caches ?? '-'}</span>
       </div>
     </div>
     <div class="stat-card">
       <div class="stat-icon"><Box size={18} /></div>
       <div class="stat-content">
-        <span class="stat-label">Objects</span>
+        <span class="stat-label">{t('objects')}</span>
         <span class="stat-value">{summary?.counts?.objects ?? '-'}</span>
       </div>
     </div>
     <div class="stat-card">
       <div class="stat-icon"><Layers3 size={18} /></div>
       <div class="stat-content">
-        <span class="stat-label">NARs</span>
+        <span class="stat-label">{t('dash.nars')}</span>
         <span class="stat-value">{summary?.counts?.nars ?? '-'}</span>
       </div>
     </div>
     <div class="stat-card">
       <div class="stat-icon"><Server size={18} /></div>
       <div class="stat-content">
-        <span class="stat-label">Storage</span>
+        <span class="stat-label">{t('storage')}</span>
         <span class="stat-value">{usage ? formatBytes(latestUsage) : '-'}</span>
       </div>
     </div>
@@ -268,12 +237,12 @@
           <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid hsl(var(--border));">
             <div class="search-wrapper" style="flex:1;">
               <Search size={15} />
-              <input class="input" bind:value={cacheQuery} placeholder="搜索缓存、endpoint、public key" autocomplete="off" />
+              <input class="input" bind:value={cacheQuery} placeholder={t('dash.searchPlaceholder')} autocomplete="off" />
             </div>
-            <div class="tabs" aria-label="缓存可见性">
-              <button class="tab" class:active={cacheVisibility === 'all'} on:click={() => cacheVisibility = 'all'}>全部</button>
-              <button class="tab" class:active={cacheVisibility === 'public'} on:click={() => cacheVisibility = 'public'}>公开</button>
-              <button class="tab" class:active={cacheVisibility === 'private'} on:click={() => cacheVisibility = 'private'}>私有</button>
+            <div class="tabs">
+              <button class="tab" class:active={cacheVisibility === 'all'} on:click={() => cacheVisibility = 'all'}>{t('all')}</button>
+              <button class="tab" class:active={cacheVisibility === 'public'} on:click={() => cacheVisibility = 'public'}>{t('public')}</button>
+              <button class="tab" class:active={cacheVisibility === 'private'} on:click={() => cacheVisibility = 'private'}>{t('private')}</button>
             </div>
             <div class="tabs compact">
               <button class="tab" class:active={cacheView === 'cards'} on:click={() => cacheView = 'cards'}><Grid2X2 size={14} /></button>
@@ -293,17 +262,17 @@
                           <p>{cache.store_dir}</p>
                         </div>
                         <span class="badge" class:badge-success={cache.is_public} class:badge-warning={!cache.is_public}>
-                          {cache.is_public ? '公开' : '私有'} · P{cache.priority}
+                          {cache.is_public ? t('public') : t('private')} · P{cache.priority}
                         </span>
                       </div>
                       <div class="cache-card-facts">
-                        <div class="cache-card-fact"><span>Objects</span><strong>{cache.objects}</strong></div>
-                        <div class="cache-card-fact"><span>Retention</span><strong>{formatRetention(cache.retention_period)}</strong></div>
-                        <div class="cache-card-fact"><span>Created</span><strong>{formatDate(cache.created_at)}</strong></div>
+                        <div class="cache-card-fact"><span>{t('objects')}</span><strong>{cache.objects}</strong></div>
+                        <div class="cache-card-fact"><span>{t('retention')}</span><strong>{formatRetention(cache.retention_period)}</strong></div>
+                        <div class="cache-card-fact"><span>{t('created')}</span><strong>{formatDate(cache.created_at)}</strong></div>
                       </div>
                       <div style="display:flex;flex-direction:column;gap:4px;">
                         <div style="display:flex;align-items:center;justify-content:space-between;">
-                          <span style="font-size:0.72rem;color:hsl(var(--muted-foreground));">Substituter</span>
+                          <span style="font-size:0.72rem;color:hsl(var(--muted-foreground));">{t('substituter')}</span>
                           <button class="btn btn-ghost btn-sm btn-icon" on:click={() => copyText(cache.substituter_endpoint, 'Substituter')}>
                             <Clipboard size={13} />
                           </button>
@@ -313,22 +282,22 @@
                       <div class="cache-card-actions">
                         <a class="btn btn-primary btn-sm" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
                           <ExternalLink size={14} />
-                          <span>Details</span>
+                          <span>{t('details')}</span>
                         </a>
                         <button class="btn btn-secondary btn-sm" on:click={() => copyText(cache.substituter_endpoint, 'Substituter')}>
                           <Clipboard size={14} />
-                          <span>Copy URL</span>
+                          <span>{t('dash.copyUrl')}</span>
                         </button>
                         <button class="btn btn-secondary btn-sm" on:click={() => copyText(cache.public_key, 'Public key')}>
                           <Clipboard size={14} />
-                          <span>Copy Key</span>
+                          <span>{t('dash.copyKey')}</span>
                         </button>
                       </div>
                     </div>
                   {/each}
                 </div>
               {:else}
-                <div class="empty">{loading ? '正在加载缓存...' : '没有匹配的缓存。'}</div>
+                <div class="empty">{loading ? t('dash.loadingCaches') : t('dash.noMatchingCaches')}</div>
               {/if}
             </div>
           {:else}
@@ -336,11 +305,11 @@
               <table class="table">
                 <thead>
                   <tr>
-                    <th>名称</th>
-                    <th>状态</th>
-                    <th>对象</th>
-                    <th>保留</th>
-                    <th>Substituter</th>
+                    <th>{t('dash.name')}</th>
+                    <th>{t('status')}</th>
+                    <th>{t('objects')}</th>
+                    <th>{t('retention')}</th>
+                    <th>{t('substituter')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -348,7 +317,7 @@
                   {#each filteredCaches as cache}
                     <tr>
                       <td><strong>{cache.name}</strong><br><span style="font-size:0.75rem;color:hsl(var(--muted-foreground));">{cache.store_dir}</span></td>
-                      <td><span class="badge" class:badge-success={cache.is_public} class:badge-warning={!cache.is_public}>{cache.is_public ? '公开' : '私有'}</span></td>
+                      <td><span class="badge" class:badge-success={cache.is_public} class:badge-warning={!cache.is_public}>{cache.is_public ? t('public') : t('private')}</span></td>
                       <td>{cache.objects}</td>
                       <td>{formatRetention(cache.retention_period)}</td>
                       <td><code class="code-inline" style="font-size:0.72rem;max-width:280px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{cache.substituter_endpoint}</code></td>
@@ -362,7 +331,7 @@
                 </tbody>
               </table>
               {#if !filteredCaches.length}
-                <div class="empty">{loading ? '正在加载缓存...' : '没有匹配的缓存。'}</div>
+                <div class="empty">{loading ? t('dash.loadingCaches') : t('dash.noMatchingCaches')}</div>
               {/if}
             </div>
           {/if}
@@ -372,17 +341,17 @@
       <div class="card">
         <div class="card-header">
           <div>
-            <h2>Commands</h2>
-            <p>{commandTab === 'client' ? '登录、启用缓存并推送 store path。' : '公开缓存可直接作为 substituter。'}</p>
+            <h2>{t('dash.commands')}</h2>
+            <p>{commandTab === 'client' ? t('dash.commandsDesc') : t('dash.commandsDescNix')}</p>
           </div>
           <div class="tabs">
             <button class="tab" class:active={commandTab === 'client'} on:click={() => commandTab = 'client'}>
               <Terminal size={13} />
-              <span>Client</span>
+              <span>{t('dash.client')}</span>
             </button>
             <button class="tab" class:active={commandTab === 'nix'} on:click={() => commandTab = 'nix'}>
               <Server size={13} />
-              <span>Nix</span>
+              <span>{t('dash.nix')}</span>
             </button>
           </div>
         </div>
@@ -393,7 +362,7 @@
                 <span style="font-size:0.72rem;font-weight:600;color:hsl(var(--muted-foreground));">{command.label}</span>
                 <code style="display:block;font-family:monospace;font-size:0.78rem;color:hsl(var(--foreground));margin-top:2px;word-break:break-all;">{command.value}</code>
               </div>
-              <button class="btn btn-ghost btn-sm btn-icon" title={`复制${command.label}`} on:click={() => copyText(command.value, command.label)}>
+              <button class="btn btn-ghost btn-sm btn-icon" title={`${t('copy')} ${command.label}`} on:click={() => copyText(command.value, command.label)}>
                 <Clipboard size={13} />
               </button>
             </div>
@@ -406,22 +375,22 @@
       <div class="card">
         <div class="card-header">
           <div>
-            <h2>管理员 Token</h2>
-            <p>保存在当前浏览器，可用于创建缓存和客户端登录。</p>
+            <h2>{t('dash.adminToken')}</h2>
+            <p>{t('dash.adminTokenDesc')}</p>
           </div>
           <KeyRound size={18} style="color:hsl(var(--muted-foreground));" />
         </div>
         <div class="card-body">
-          <code style="display:block;padding:8px 10px;border-radius:var(--radius);background:hsl(var(--muted));font-family:monospace;font-size:0.75rem;word-break:break-all;line-height:1.5;color:hsl(var(--foreground));">{token || '等待服务返回'}</code>
+          <code style="display:block;padding:8px 10px;border-radius:var(--radius);background:hsl(var(--muted));font-family:monospace;font-size:0.75rem;word-break:break-all;line-height:1.5;color:hsl(var(--foreground));">{token || t('waitServer')}</code>
           {#if adminTokenExpires}
-            <p style="font-size:0.75rem;color:hsl(var(--muted-foreground));margin-top:8px;">有效期至 {formatDate(adminTokenExpires)}</p>
+            <p style="font-size:0.75rem;color:hsl(var(--muted-foreground));margin-top:8px;">{t('dash.expiresAt')} {formatDate(adminTokenExpires)}</p>
           {/if}
           <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px;">
             <button class="btn btn-primary" on:click={issueAdminToken} disabled={tokenBusy}>
               <Sparkles size={15} />
-              <span>{tokenBusy ? '生成中' : '重新生成'}</span>
+              <span>{tokenBusy ? t('dash.regenerating') : t('dash.regenerate')}</span>
             </button>
-            <button class="btn btn-secondary btn-icon" on:click={() => copyText(token, '管理员 Token')}>
+            <button class="btn btn-secondary btn-icon" on:click={() => copyText(token, t('dash.adminToken'))}>
               <Clipboard size={15} />
             </button>
           </div>
@@ -431,34 +400,34 @@
       <div class="card">
         <div class="card-header">
           <div>
-            <h2>创建缓存</h2>
-            <p>默认生成签名 keypair。</p>
+            <h2>{t('dash.createCache')}</h2>
+            <p>{t('dash.createCacheDesc')}</p>
           </div>
           <Plus size={18} style="color:hsl(var(--muted-foreground));" />
         </div>
         <div class="card-body">
           <div style="display:flex;flex-direction:column;gap:12px;">
             <label class="label">
-              <span>名称</span>
+              <span>{t('dash.name')}</span>
               <input class="input" bind:value={create.name} placeholder="main" autocomplete="off" />
             </label>
             <label class="label">
-              <span>Store 目录</span>
+              <span>{t('dash.storeDir')}</span>
               <input class="input" bind:value={create.storeDir} />
             </label>
             <div class="form-row">
               <label class="label">
-                <span>优先级</span>
+                <span>{t('dash.priority')}</span>
                 <input class="input" bind:value={create.priority} type="number" />
               </label>
               <label class="checkbox-label" style="align-self:end;height:36px;">
                 <input bind:checked={create.isPublic} type="checkbox" />
-                <span>公开</span>
+                <span>{t('dash.isPublic')}</span>
               </label>
             </div>
             <button class="btn btn-primary" on:click={createCache} disabled={createBusy} style="width:100%;">
               <Plus size={15} />
-              <span>{createBusy ? '创建中' : '创建缓存'}</span>
+              <span>{createBusy ? t('dash.creating') : t('dash.create')}</span>
             </button>
             {#if createMessage}
               <p style="font-size:0.78rem;color:hsl(var(--muted-foreground));">{createMessage}</p>

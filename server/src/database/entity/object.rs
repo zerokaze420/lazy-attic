@@ -74,6 +74,9 @@ pub struct Model {
     /// This is a "username." Currently, it's set to the `sub` claim in
     /// the client's JWT.
     pub created_by: Option<String>,
+
+    /// Number of times this object has been accessed via the NAR endpoint.
+    pub access_count: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -108,6 +111,7 @@ impl InsertExt for Insert<ActiveModel> {
                     Column::CreatedAt,
                     Column::LastAccessedAt,
                     Column::CreatedBy,
+                    Column::AccessCount,
                 ])
                 .to_owned(),
         )

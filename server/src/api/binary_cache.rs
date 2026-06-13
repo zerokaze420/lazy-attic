@@ -209,6 +209,7 @@ async fn get_nar(
     }
 
     database.bump_object_last_accessed(object.id).await?;
+    database.increment_object_access_count(object.id).await?;
 
     if chunks.len() == 1 {
         // single chunk

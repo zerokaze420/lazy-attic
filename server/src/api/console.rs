@@ -128,6 +128,27 @@ pub(crate) struct ObjectListParams {
     offset: Option<u64>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct StatsParams {
+    period: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ConsoleCacheStats {
+    cache: ConsoleCache,
+    period: u64,
+    total_accesses: u64,
+    points: Vec<ConsoleStatsPoint>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ConsoleStatsPoint {
+    date: String,
+    upload_count: u64,
+    upload_bytes: i64,
+    accessed_count: u64,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct ConsoleObjectList {
     cache: ConsoleCache,
@@ -526,6 +547,84 @@ pub(crate) async fn object_detail(
     Ok(Json(ConsoleObjectDetail {
         object: console_object(&cache_summary, object, nar),
         cache: cache_summary,
+    }))
+}
+
+pub(crate) async fn stats(
+    Extension(state): Extension<State>,
+    Extension(req_state): Extension<RequestState>,
+    Path(cache_name): Path<String>,
+    Query(params): Query<StatsParams>,
+) -> ServerResult<Json<ConsoleCacheStats>> {
+    let database = state.database().await?;
+    let cache = Cache::find()
+        .filter(cache::Column::Name.eq(&cache_name))
+        .filter(cache::Column::DeletedAt.is_null())
+        .one(database)
+        .await
+        .map_err(ServerError::database_error)?
+        .ok_or_else(|| ErrorKind::NoSuchCache)?;
+
+    let total = Object::find()
+        .filter(object::Column::CacheId.eq(cache.id))
+        .count(database)
+        .await
+        .map_err(ServerError::database_error)?;
+    let cache_summary = console_cache(&cache, total, &req_state)?;
+
+    let period = params.period.unwrap_or(30).clamp(1, 365);
+    let start_date = Utc::now() - ChronoDuration::days(period as i64);
+
+    let rows = Object::find()
+        .filter(object::Column::CacheId.eq(cache.id))
+        .filter(object::Column::CreatedAt.gte(start_date))
+        .find_also_related(Nar)
+        .all(database)
+        .await
+        .map_err(ServerError::database_error)?;
+
+    let mut total_accesses: u64 = 0;
+    let mut uploads_by_date: HashMap<String, (u64, i64)> = HashMap::new();
+    let mut accessed_by_date: HashMap<String, u64> = HashMap::new();
+
+    for (object, nar) in &rows {
+        total_accesses += object.access_count.max(0) as u64;
+
+        let upload_day = object.created_at.format("%Y-%m-%d").to_string();
+        let nar_size = nar.as_ref().map(|n| n.nar_size.max(0)).unwrap_or(0);
+        let entry = uploads_by_date.entry(upload_day).or_default();
+        entry.0 += 1;
+        entry.1 += nar_size;
+
+        if let Some(last_accessed) = object.last_accessed_at {
+            let access_day = last_accessed.format("%Y-%m-%d").to_string();
+            *accessed_by_date.entry(access_day).or_default() += 1;
+        }
+    }
+
+    let mut points: Vec<ConsoleStatsPoint> = Vec::new();
+    for day_offset in (0..period).rev() {
+        let date = (Utc::now() - ChronoDuration::days(day_offset as i64))
+            .format("%Y-%m-%d")
+            .to_string();
+        let (upload_count, upload_bytes) = uploads_by_date
+            .get(&date)
+            .copied()
+            .unwrap_or_default();
+        let accessed_count = accessed_by_date.get(&date).copied().unwrap_or(0);
+        points.push(ConsoleStatsPoint {
+            date,
+            upload_count,
+            upload_bytes,
+            accessed_count,
+        });
+    }
+
+    Ok(Json(ConsoleCacheStats {
+        cache: cache_summary,
+        period,
+        total_accesses,
+        points,
     }))
 }
 

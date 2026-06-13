@@ -57,6 +57,9 @@ pub trait AtticDatabase: Send + Sync {
 
     /// Bumps the last accessed timestamp of an object.
     async fn bump_object_last_accessed(&self, object_id: i64) -> ServerResult<()>;
+
+    /// Increments the access count of an object.
+    async fn increment_object_access_count(&self, object_id: i64) -> ServerResult<()>;
 }
 
 pub struct NarGuard {
@@ -316,6 +319,26 @@ impl AtticDatabase for DatabaseConnection {
         .exec(self)
         .await
         .map_err(ServerError::database_error)?;
+
+        Ok(())
+    }
+
+    async fn increment_object_access_count(&self, object_id: i64) -> ServerResult<()> {
+        let one = Value::Unsigned(Some(1));
+
+        let update = Query::update()
+            .table(Object)
+            .values([(
+                object::Column::AccessCount,
+                Expr::col(object::Column::AccessCount).add(one),
+            )])
+            .and_where(object::Column::Id.eq(object_id))
+            .to_owned();
+
+        let stmt = self.get_database_backend().build(&update);
+        self.execute(stmt)
+            .await
+            .map_err(ServerError::database_error)?;
 
         Ok(())
     }

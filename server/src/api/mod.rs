@@ -38,6 +38,10 @@ pub(crate) fn get_router() -> Router {
             get(console::object_detail),
         )
         .route(
+            "/_api/web/caches/:cache/stats",
+            get(console::stats),
+        )
+        .route(
             "/_api/web/caches/:cache/config",
             patch(v1::cache_config::configure_cache).delete(v1::cache_config::destroy_cache),
         );
