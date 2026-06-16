@@ -20,6 +20,11 @@
   import InfoLine from './InfoLine.svelte';
   import LineChart from '$lib/LineChart.svelte';
   import { t, formatDate, formatBytes, formatRetention } from '$lib/i18n/index.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Select } from '$lib/components/ui/select';
+  import { Textarea } from '$lib/components/ui/textarea';
 
   let cacheName = '';
   let token = '';
@@ -31,6 +36,7 @@
   let error = '';
   let message = '';
   let copyMessage = '';
+  let copyState = '';
   let configTab = 'settings';
 
   let edit = {
@@ -172,9 +178,19 @@
 
   async function copyText(value, label) {
     if (!value) return;
-    await navigator.clipboard.writeText(value);
-    copyMessage = t('cache.copyToast', { label });
-    setTimeout(() => { copyMessage = ''; }, 1800);
+    try {
+      await navigator.clipboard.writeText(value);
+      copyMessage = t('cache.copyToast', { label });
+      copyState = 'success';
+    } catch (err) {
+      copyMessage = err instanceof Error ? err.message : String(err);
+      copyState = 'error';
+    } finally {
+      setTimeout(() => {
+        copyMessage = '';
+        copyState = '';
+      }, 1800);
+    }
   }
 
   $: period = stats?.period ?? 30;
@@ -188,7 +204,7 @@
       points: stats.points.map((p) => ({ x: p.date, y: p.upload_count }))
     },
     {
-      key: 'active',
+      key: 'downloads',
       label: t('cache.accessesPerDay'),
       color: 'hsl(142 76% 36%)',
       points: stats.points.map((p) => ({ x: p.date, y: p.accessed_count }))
@@ -209,18 +225,18 @@
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-heading-row">
-      <a class="btn btn-ghost btn-sm btn-icon" href="/">
+      <Button variant="ghost" size="icon" class="size-8" href="/">
         <ArrowLeft size={16} />
-      </a>
+      </Button>
       <div class="page-heading">
         <h1 class="page-title">{cacheName || t('cache.title')}</h1>
         <p class="page-description">{cache?.store_dir ?? t('cache.nixStore')}</p>
       </div>
     </div>
-    <button class="btn btn-secondary" type="button" on:click={loadData} disabled={loading}>
+    <Button variant="secondary" type="button" on:click={loadData} disabled={loading}>
       <span class:spin={loading}><RefreshCw size={15} /></span>
       <span>{t('refresh')}</span>
-    </button>
+    </Button>
   </div>
 </div>
 
@@ -317,7 +333,7 @@
                   {#each systems as sys}
                     <div class="breakdown-row">
                       <div class="breakdown-row-label">
-                        <span class="badge badge-default badge-sm">{sys.name}</span>
+                        <Badge variant="secondary">{sys.name}</Badge>
                       </div>
                       <div class="breakdown-bar-track">
                         <div class="breakdown-bar" style="width:{(sys.count / maxSysCount) * 100}%"></div>
@@ -336,7 +352,7 @@
                   {#each compressions as comp}
                     <div class="breakdown-row">
                       <div class="breakdown-row-label">
-                        <span class="badge badge-default badge-sm">{comp.name}</span>
+                        <Badge variant="secondary">{comp.name}</Badge>
                       </div>
                       <div class="breakdown-bar-track">
                         <div class="breakdown-bar" style="width:{(comp.count / maxCompCount) * 100}%"></div>
@@ -379,11 +395,11 @@
           <div class="form-grid">
             <label class="label">
               <span>{t('cache.storeDir')}</span>
-              <input class="input" bind:value={edit.storeDir} />
+              <Input bind:value={edit.storeDir} />
             </label>
             <label class="label">
               <span>{t('dash.priority')}</span>
-              <input class="input" type="number" bind:value={edit.priority} />
+              <Input type="number" bind:value={edit.priority} />
             </label>
             <label class="checkbox-label">
               <input type="checkbox" bind:checked={edit.isPublic} />
@@ -391,31 +407,31 @@
             </label>
             <label class="label">
               <span>{t('cache.retentionMode')}</span>
-              <select class="select" bind:value={edit.retentionMode}>
+              <Select bind:value={edit.retentionMode}>
                 <option value="global">{t('globalDefault')}</option>
                 <option value="period">{t('cache.retentionSeconds')}</option>
-              </select>
+              </Select>
             </label>
             {#if edit.retentionMode === 'period'}
               <label class="label">
                 <span>{t('cache.retentionSeconds')}</span>
-                <input class="input" type="number" min="0" bind:value={edit.retentionSeconds} />
+                <Input type="number" min="0" bind:value={edit.retentionSeconds} />
               </label>
             {/if}
             <label class="label full-width">
               <span>{t('cache.upstreamKeys')}</span>
-              <textarea class="textarea" bind:value={edit.upstream} rows="3"></textarea>
+              <Textarea bind:value={edit.upstream} rows="3" />
             </label>
           </div>
           <div class="form-actions mt-md">
-            <button class="btn btn-primary" type="button" on:click={saveCache} disabled={busy}>
+            <Button type="button" on:click={saveCache} disabled={busy}>
               <Save size={15} />
               <span>{busy ? t('saving') : t('cache.saveConfig')}</span>
-            </button>
-            <button class="btn btn-destructive" type="button" on:click={deleteCache} disabled={busy}>
+            </Button>
+            <Button variant="destructive" type="button" on:click={deleteCache} disabled={busy}>
               <Trash2 size={15} />
               <span>{t('cache.deleteCache')}</span>
-            </button>
+            </Button>
           </div>
           {#if message}
             <p class="message-text mt-sm">{message}</p>
@@ -436,5 +452,5 @@
 </div>
 
 {#if copyMessage}
-  <div class="toast">{copyMessage}</div>
+  <div class="toast" class:error={copyState === 'error'}>{copyMessage}</div>
 {/if}

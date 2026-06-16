@@ -1,3 +1,4 @@
+import { writable, get } from 'svelte/store';
 import zh from './zh';
 import en from './en';
 
@@ -5,33 +6,34 @@ const translations = { zh, en } as const;
 type Locale = keyof typeof translations;
 type Translation = typeof zh;
 
-let locale = $state<Locale>('zh');
-
 const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('attic.locale') : null;
+let initialLocale: Locale = 'zh';
 if (saved === 'en' || saved === 'zh') {
-  locale = saved;
+  initialLocale = saved;
 } else if (typeof navigator !== 'undefined') {
   const lang = navigator.language.toLowerCase();
   if (lang.startsWith('zh')) {
-    locale = 'zh';
+    initialLocale = 'zh';
   } else if (lang.startsWith('en')) {
-    locale = 'en';
+    initialLocale = 'en';
   }
 }
 
+export const locale = writable<Locale>(initialLocale);
+
 export function getLocale() {
-  return locale;
+  return get(locale);
 }
 
 export function setLocale(l: Locale) {
-  locale = l;
+  locale.set(l);
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem('attic.locale', l);
   }
 }
 
 export function toggleLocale() {
-  setLocale(locale === 'zh' ? 'en' : 'zh');
+  setLocale(getLocale() === 'zh' ? 'en' : 'zh');
 }
 
 type NestedKeyOf<T, K extends keyof T = keyof T> = K extends string
@@ -47,7 +49,7 @@ function getNested(obj: any, path: string): string {
 }
 
 export function t(key: DotPath, params?: Record<string, string | number>): string {
-  const dict = translations[locale];
+  const dict = translations[getLocale()];
   let text: string = getNested(dict, key);
   if (params) {
     for (const [k, v] of Object.entries(params)) {
@@ -67,13 +69,13 @@ export function formatDate(dateStr: string): string {
     hour: '2-digit',
     minute: '2-digit'
   };
-  const langTag = locale === 'zh' ? 'zh-CN' : 'en-US';
+  const langTag = getLocale() === 'zh' ? 'zh-CN' : 'en-US';
   return new Intl.DateTimeFormat(langTag, opts).format(date);
 }
 
 export function formatBytes(value: number): string {
   if (!Number.isFinite(value)) return '-';
-  const units = locale === 'zh'
+  const units = getLocale() === 'zh'
     ? ['B', 'KiB', 'MiB', 'GiB', 'TiB']
     : ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
   let size = Math.max(0, value);

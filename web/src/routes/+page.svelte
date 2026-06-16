@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import {
     AlertCircle,
-    BookOpen,
     Box,
     Clipboard,
     Database,
@@ -19,6 +18,9 @@
     Terminal
   } from '@lucide/svelte';
   import { t, formatDate, formatBytes, formatRetention } from '$lib/i18n/index.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
 
   const defaultCreate = {
     name: '',
@@ -47,6 +49,7 @@
   let s3Form = { region: 'us-east-1', bucket: '', endpoint: '', access_key_id: '', secret_access_key: '' };
   let storageBusy = false;
   let storageMessage = '';
+  let copyState = '';
 
   onMount(() => {
     origin = location.origin;
@@ -154,27 +157,37 @@
 
   async function copyText(value, label) {
     if (!value || value.startsWith('<')) return;
-    await navigator.clipboard.writeText(value);
-    copyMessage = t('copied');
-    setTimeout(() => { copyMessage = ''; }, 1800);
+    try {
+      await navigator.clipboard.writeText(value);
+      copyMessage = t('cache.copyToast', { label });
+      copyState = 'success';
+    } catch (err) {
+      copyMessage = err instanceof Error ? err.message : String(err);
+      copyState = 'error';
+    } finally {
+      setTimeout(() => {
+        copyMessage = '';
+        copyState = '';
+      }, 1800);
+    }
   }
 
-  function matchesCache(cache) {
-    const query = cacheQuery.trim().toLowerCase();
+  function matchesCache(cache, queryText, visibility) {
+    const query = queryText.trim().toLowerCase();
     const matchesQuery = !query || [
       cache.name, cache.store_dir, cache.substituter_endpoint,
       cache.api_endpoint, cache.public_key,
       ...(cache.upstream_cache_key_names ?? [])
     ].some((v) => String(v ?? '').toLowerCase().includes(query));
     const matchesVisibility =
-      cacheVisibility === 'all' ||
-      (cacheVisibility === 'public' && cache.is_public) ||
-      (cacheVisibility === 'private' && !cache.is_public);
+      visibility === 'all' ||
+      (visibility === 'public' && cache.is_public) ||
+      (visibility === 'private' && !cache.is_public);
     return matchesQuery && matchesVisibility;
   }
 
   $: caches = summary?.caches ?? [];
-  $: filteredCaches = caches.filter(matchesCache);
+  $: filteredCaches = caches.filter((cache) => matchesCache(cache, cacheQuery, cacheVisibility));
   $: publicCacheModel = caches.find((c) => c.is_public) || caches[0];
   $: exampleCache = caches[0]?.name || '<cache-name>';
   $: publicCache = publicCacheModel?.name || exampleCache;
@@ -203,14 +216,10 @@
       <p class="page-description">{t('dash.description')}</p>
     </div>
     <div class="page-actions">
-      <a class="btn btn-secondary" href="/guide">
-        <BookOpen size={15} />
-        <span>{t('sidebar.guide')}</span>
-      </a>
-      <button class="btn btn-secondary" on:click={refresh} disabled={loading}>
+      <Button variant="secondary" on:click={refresh} disabled={loading}>
         <span class:spin={loading}><RefreshCw size={15} /></span>
         <span>{t('refresh')}</span>
-      </button>
+      </Button>
     </div>
   </div>
 </div>
@@ -261,7 +270,7 @@
           <div class="panel-toolbar">
             <div class="search-wrapper panel-toolbar-main">
               <Search size={15} />
-              <input class="input" bind:value={cacheQuery} placeholder={t('dash.searchPlaceholder')} autocomplete="off" />
+              <Input bind:value={cacheQuery} placeholder={t('dash.searchPlaceholder')} autocomplete="off" />
             </div>
             <div class="tabs">
               <button class="tab" class:active={cacheVisibility === 'all'} on:click={() => cacheVisibility = 'all'}>{t('all')}</button>
@@ -285,9 +294,9 @@
                           <h3>{cache.name}</h3>
                           <p>{cache.store_dir}</p>
                         </div>
-                        <span class="badge" class:badge-success={cache.is_public} class:badge-warning={!cache.is_public}>
+                        <Badge variant="secondary" class={cache.is_public ? 'status-public' : 'status-private'}>
                           {cache.is_public ? t('public') : t('private')} · P{cache.priority}
-                        </span>
+                        </Badge>
                       </div>
                       <div class="cache-card-facts">
                         <div class="cache-card-fact"><span>{t('objects')}</span><strong>{cache.objects}</strong></div>
@@ -297,25 +306,25 @@
                       <div class="cache-card-field">
                         <div class="cache-card-field-head">
                           <span class="field-label">{t('substituter')}</span>
-                          <button class="btn btn-ghost btn-sm btn-icon" on:click={() => copyText(cache.substituter_endpoint, 'Substituter')}>
+                          <Button variant="ghost" size="icon" class="size-8" on:click={() => copyText(cache.substituter_endpoint, 'Substituter')}>
                             <Clipboard size={13} />
-                          </button>
+                          </Button>
                         </div>
                         <code class="code-inline block">{cache.substituter_endpoint}</code>
                       </div>
                       <div class="cache-card-actions">
-                        <a class="btn btn-primary btn-sm" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
+                        <Button size="sm" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
                           <ExternalLink size={14} />
                           <span>{t('details')}</span>
-                        </a>
-                        <button class="btn btn-secondary btn-sm" on:click={() => copyText(cache.substituter_endpoint, 'Substituter')}>
+                        </Button>
+                        <Button variant="secondary" size="sm" on:click={() => copyText(cache.substituter_endpoint, 'Substituter')}>
                           <Clipboard size={14} />
                           <span>{t('dash.copyUrl')}</span>
-                        </button>
-                        <button class="btn btn-secondary btn-sm" on:click={() => copyText(cache.public_key, 'Public key')}>
+                        </Button>
+                        <Button variant="secondary" size="sm" on:click={() => copyText(cache.public_key, 'Public key')}>
                           <Clipboard size={14} />
                           <span>{t('dash.copyKey')}</span>
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   {/each}
@@ -341,14 +350,14 @@
                   {#each filteredCaches as cache}
                     <tr>
                       <td><strong>{cache.name}</strong><br><span class="meta-text">{cache.store_dir}</span></td>
-                      <td><span class="badge" class:badge-success={cache.is_public} class:badge-warning={!cache.is_public}>{cache.is_public ? t('public') : t('private')}</span></td>
+                      <td><Badge variant="secondary" class={cache.is_public ? 'status-public' : 'status-private'}>{cache.is_public ? t('public') : t('private')}</Badge></td>
                       <td>{cache.objects}</td>
                       <td>{formatRetention(cache.retention_period)}</td>
                       <td><code class="code-inline truncate">{cache.substituter_endpoint}</code></td>
                       <td>
-                        <a class="btn btn-ghost btn-sm btn-icon" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
+                        <Button variant="ghost" size="icon" class="size-8" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
                           <ExternalLink size={14} />
-                        </a>
+                        </Button>
                       </td>
                     </tr>
                   {/each}
@@ -386,9 +395,9 @@
                 <span class="field-label">{command.label}</span>
                 <code>{command.value}</code>
               </div>
-              <button class="btn btn-ghost btn-sm btn-icon" title={`${t('copy')} ${command.label}`} on:click={() => copyText(command.value, command.label)}>
+              <Button variant="ghost" size="icon" class="size-8" title={`${t('copy')} ${command.label}`} on:click={() => copyText(command.value, command.label)}>
                 <Clipboard size={13} />
-              </button>
+              </Button>
             </div>
           {/each}
         </div>
@@ -424,27 +433,27 @@
             <div class="stack stack-sm mt-sm">
               <label class="label">
                 <span>Region</span>
-                <input class="input" bind:value={s3Form.region} placeholder="us-east-1" />
+                <Input bind:value={s3Form.region} placeholder="us-east-1" />
               </label>
               <label class="label">
                 <span>Bucket</span>
-                <input class="input" bind:value={s3Form.bucket} placeholder="attic-cache" />
+                <Input bind:value={s3Form.bucket} placeholder="attic-cache" />
               </label>
               <label class="label">
                 <span>Endpoint <span class="meta-text">（MinIO / R2 等填此项）</span></span>
-                <input class="input" bind:value={s3Form.endpoint} placeholder="https://s3.amazonaws.com" />
+                <Input bind:value={s3Form.endpoint} placeholder="https://s3.amazonaws.com" />
               </label>
               <label class="label">
                 <span>Access Key ID</span>
-                <input class="input" bind:value={s3Form.access_key_id} placeholder="可选，留空则读取环境变量" />
+                <Input bind:value={s3Form.access_key_id} placeholder="可选，留空则读取环境变量" />
               </label>
               <label class="label">
                 <span>Secret Access Key</span>
-                <input class="input" bind:value={s3Form.secret_access_key} type="password" placeholder="可选，留空则读取环境变量" />
+                <Input bind:value={s3Form.secret_access_key} type="password" placeholder="可选，留空则读取环境变量" />
               </label>
-              <button class="btn btn-primary full-width-button" on:click={saveStorageConfig} disabled={storageBusy}>
+              <Button class="full-width-button" on:click={saveStorageConfig} disabled={storageBusy}>
                 <span>{storageBusy ? '保存中' : '保存 S3 配置'}</span>
-              </button>
+              </Button>
               {#if storageMessage}
                 <p class="message-text">{storageMessage}</p>
               {/if}
@@ -467,13 +476,13 @@
             <p class="meta-text mt-xs">{t('dash.expiresAt')} {formatDate(adminTokenExpires)}</p>
           {/if}
           <div class="token-actions">
-            <button class="btn btn-primary" on:click={issueAdminToken} disabled={tokenBusy}>
+            <Button on:click={issueAdminToken} disabled={tokenBusy}>
               <Sparkles size={15} />
               <span>{tokenBusy ? t('dash.regenerating') : t('dash.regenerate')}</span>
-            </button>
-            <button class="btn btn-secondary btn-icon" on:click={() => copyText(token, t('dash.adminToken'))}>
+            </Button>
+            <Button variant="secondary" size="icon" on:click={() => copyText(token, t('dash.adminToken'))}>
               <Clipboard size={15} />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -490,26 +499,26 @@
           <div class="stack stack-sm">
             <label class="label">
               <span>{t('dash.name')}</span>
-              <input class="input" bind:value={create.name} placeholder="main" autocomplete="off" />
+              <Input bind:value={create.name} placeholder="main" autocomplete="off" />
             </label>
             <label class="label">
               <span>{t('dash.storeDir')}</span>
-              <input class="input" bind:value={create.storeDir} />
+              <Input bind:value={create.storeDir} />
             </label>
             <div class="form-row">
               <label class="label">
                 <span>{t('dash.priority')}</span>
-                <input class="input" bind:value={create.priority} type="number" />
+                <Input bind:value={create.priority} type="number" />
               </label>
               <label class="checkbox-label inline-checkbox">
                 <input bind:checked={create.isPublic} type="checkbox" />
                 <span>{t('dash.isPublic')}</span>
               </label>
             </div>
-            <button class="btn btn-primary full-width-button" on:click={createCache} disabled={createBusy}>
+            <Button class="full-width-button" on:click={createCache} disabled={createBusy}>
               <Plus size={15} />
               <span>{createBusy ? t('dash.creating') : t('dash.create')}</span>
-            </button>
+            </Button>
             {#if createMessage}
               <p class="message-text">{createMessage}</p>
             {/if}
@@ -521,5 +530,5 @@
 </div>
 
 {#if copyMessage}
-  <div class="toast">{copyMessage}</div>
+  <div class="toast" class:error={copyState === 'error'}>{copyMessage}</div>
 {/if}

@@ -1,25 +1,51 @@
+@import "tailwindcss";
+
 :root {
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 100% / 0.05;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 268 83% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 100% / 0.08;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 100% / 0.07;
+  --muted-foreground: 240 5% 72%;
+  --accent: 268 83% 58%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 100% / 0.1;
+  --input: 0 0% 100% / 0.12;
+  --ring: 268 83% 70%;
+  --radius: 1.25rem;
+  --sidebar-width: 240px;
+  --font-body: "LXGW WenKai SC", "LXGW WenKai", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Iosevka", "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+html[data-theme="light"] {
   --background: 0 0% 100%;
   --foreground: 240 10% 3.9%;
   --card: 0 0% 100%;
   --card-foreground: 240 10% 3.9%;
   --popover: 0 0% 100%;
   --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
+  --primary: 262 83% 58%;
+  --primary-foreground: 0 0% 100%;
   --secondary: 240 4.8% 95.9%;
   --secondary-foreground: 240 5.9% 10%;
   --muted: 240 4.8% 95.9%;
   --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
+  --accent: 262 83% 58%;
+  --accent-foreground: 0 0% 100%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
   --border: 240 5.9% 90%;
   --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
-  --radius: 0.5rem;
-  --sidebar-width: 240px;
+  --ring: 262 83% 58%;
 }
 
 * {
@@ -29,7 +55,7 @@
 }
 
 body {
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-body);
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
@@ -38,9 +64,27 @@ body {
   line-height: 1.5;
 }
 
+html[lang="en"] body,
+code,
+pre,
+kbd,
+samp,
+.code-inline,
+.code-token,
+.command-body code,
+.info-row code,
+.info-block code,
+.code-block code {
+  font-family: var(--font-mono);
+}
+
 a { color: inherit; text-decoration: none; }
 
 h1, h2, h3, h4, p { margin: 0; }
+
+code, pre, kbd, samp {
+  font-family: var(--font-mono);
+}
 
 button, input, select, textarea {
   font: inherit;
@@ -60,7 +104,7 @@ button, input, select, textarea {
   min-height: 100vh;
   overflow: auto;
   background:
-    linear-gradient(180deg, hsl(var(--muted) / 0.35), transparent 220px),
+    linear-gradient(180deg, hsl(var(--muted) / 0.2), transparent 180px),
     hsl(var(--background));
 }
 
@@ -74,6 +118,7 @@ button, input, select, textarea {
   height: 100vh;
   border-right: 1px solid hsl(var(--border));
   background: hsl(var(--card));
+  backdrop-filter: blur(16px);
 }
 
 .sidebar-header {
@@ -107,11 +152,11 @@ button, input, select, textarea {
   font-size: 0.875rem;
   font-weight: 500;
   color: hsl(var(--muted-foreground));
-  transition: background 150ms, color 150ms;
+  transition: all 300ms ease;
 }
 
 .nav-item:hover {
-  background: hsl(var(--accent));
+  background: hsl(var(--muted));
   color: hsl(var(--accent-foreground));
 }
 
@@ -124,6 +169,12 @@ button, input, select, textarea {
 .sidebar-footer {
   padding: 16px 20px;
   border-top: 1px solid hsl(var(--border));
+}
+
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .sidebar-footer p {
@@ -186,7 +237,6 @@ button, input, select, textarea {
 .page-title {
   font-size: 1.5rem;
   font-weight: 700;
-  letter-spacing: -0.025em;
   color: hsl(var(--foreground));
 }
 
@@ -272,6 +322,7 @@ button, input, select, textarea {
   gap: 10px;
   padding: 12px 16px;
   border-bottom: 1px solid hsl(var(--border));
+  flex-wrap: wrap;
 }
 
 .panel-toolbar-main {
@@ -289,6 +340,7 @@ button, input, select, textarea {
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
   background: hsl(var(--card));
+  backdrop-filter: blur(16px);
 }
 
 .card-header {
@@ -399,7 +451,7 @@ button, input, select, textarea {
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 150ms, border-color 150ms, opacity 150ms;
+  transition: all 300ms ease;
   white-space: nowrap;
 }
 
@@ -469,7 +521,7 @@ button, input, select, textarea {
   padding: 0 10px;
   border: 1px solid hsl(var(--input));
   border-radius: var(--radius);
-  background: hsl(var(--background));
+  background: hsl(var(--card));
   color: hsl(var(--foreground));
   font-size: 0.85rem;
 }
@@ -488,7 +540,7 @@ button, input, select, textarea {
   padding: 8px 10px;
   border: 1px solid hsl(var(--input));
   border-radius: var(--radius);
-  background: hsl(var(--background));
+  background: hsl(var(--card));
   color: hsl(var(--foreground));
   font-size: 0.85rem;
   resize: vertical;
@@ -506,7 +558,7 @@ button, input, select, textarea {
   padding: 0 10px;
   border: 1px solid hsl(var(--input));
   border-radius: var(--radius);
-  background: hsl(var(--background));
+  background: hsl(var(--card));
   color: hsl(var(--foreground));
   font-size: 0.85rem;
   cursor: pointer;
@@ -618,6 +670,18 @@ button, input, select, textarea {
   color: hsl(38 92% 40%);
 }
 
+.status-public {
+  background: hsl(142 72% 94%);
+  color: hsl(142 72% 28%);
+  border: 1px solid hsl(142 55% 82%);
+}
+
+.status-private {
+  background: hsl(38 92% 94%);
+  color: hsl(38 92% 32%);
+  border: 1px solid hsl(38 78% 82%);
+}
+
 .badge-outline {
   background: transparent;
   border: 1px solid hsl(var(--border));
@@ -630,6 +694,8 @@ button, input, select, textarea {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1;
+  min-width: 220px;
 }
 
 .search-wrapper svg {
@@ -637,10 +703,12 @@ button, input, select, textarea {
   left: 10px;
   color: hsl(var(--muted-foreground));
   pointer-events: none;
+  z-index: 1;
 }
 
 .search-wrapper .input {
   padding-left: 34px;
+  min-width: 0;
 }
 
 /* ===== Table ===== */
@@ -1096,11 +1164,18 @@ button, input, select, textarea {
   transform: translateX(-50%);
   padding: 8px 16px;
   border-radius: var(--radius);
-  background: hsl(var(--foreground));
-  color: hsl(var(--background));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
   font-size: 0.82rem;
   font-weight: 600;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.toast.error {
+  border-color: hsl(0 72% 51% / 0.35);
+  color: hsl(0 84% 74%);
 }
 
 /* ===== Empty State ===== */

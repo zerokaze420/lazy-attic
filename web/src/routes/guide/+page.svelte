@@ -11,11 +11,13 @@
     Wrench
   } from '@lucide/svelte';
   import { t } from '$lib/i18n/index.svelte';
+  import { Button } from '$lib/components/ui/button';
 
   let summary = null;
   let error = '';
   let origin = '';
   let copyMessage = '';
+  let copyState = '';
 
   onMount(() => {
     origin = location.origin;
@@ -34,9 +36,19 @@
 
   async function copyText(value, label) {
     if (!value || value.startsWith('<')) return;
-    await navigator.clipboard.writeText(value);
-    copyMessage = t('copied');
-    setTimeout(() => { copyMessage = ''; }, 1800);
+    try {
+      await navigator.clipboard.writeText(value);
+      copyMessage = t('cache.copyToast', { label });
+      copyState = 'success';
+    } catch (err) {
+      copyMessage = err instanceof Error ? err.message : String(err);
+      copyState = 'error';
+    } finally {
+      setTimeout(() => {
+        copyMessage = '';
+        copyState = '';
+      }, 1800);
+    }
   }
 
   $: caches = summary?.caches ?? [];
@@ -76,9 +88,9 @@
 <div class="page-header">
   <div class="guide-hero">
     <div class="guide-hero-top">
-      <a class="btn btn-ghost btn-sm btn-icon" href="/">
+      <Button variant="ghost" size="icon" class="size-8" href="/">
         <ArrowLeft size={16} />
-      </a>
+      </Button>
     </div>
     <div class="guide-hero-title">
       <div class="icon-box"><Server size={20} /></div>
@@ -161,10 +173,10 @@
         <div class="code-block mb-sm">
           <div class="code-block-header">
             <span>{block.label}</span>
-            <button class="btn btn-ghost btn-sm" type="button" on:click={() => copyText(block.value, block.label)}>
+            <Button variant="ghost" size="sm" type="button" on:click={() => copyText(block.value, block.label)}>
               <Clipboard size={13} />
               <span>{t('copy')}</span>
-            </button>
+            </Button>
           </div>
           <pre><code>{block.value}</code></pre>
         </div>
@@ -183,10 +195,10 @@
         <div class="code-block mb-sm">
           <div class="code-block-header">
             <span>{block.label}</span>
-            <button class="btn btn-ghost btn-sm" type="button" on:click={() => copyText(block.value, block.label)}>
+            <Button variant="ghost" size="sm" type="button" on:click={() => copyText(block.value, block.label)}>
               <Clipboard size={13} />
               <span>{t('copy')}</span>
-            </button>
+            </Button>
           </div>
           <pre><code>{block.value}</code></pre>
         </div>
@@ -205,10 +217,10 @@
         <div class="code-block mb-sm">
           <div class="code-block-header">
             <span>{block.label}</span>
-            <button class="btn btn-ghost btn-sm" type="button" on:click={() => copyText(block.value, block.label)}>
+            <Button variant="ghost" size="sm" type="button" on:click={() => copyText(block.value, block.label)}>
               <Clipboard size={13} />
               <span>{t('copy')}</span>
-            </button>
+            </Button>
           </div>
           <pre><code>{block.value}</code></pre>
         </div>
@@ -255,10 +267,10 @@
         <div class="code-block mb-sm">
           <div class="code-block-header">
             <span>{block.label}</span>
-            <button class="btn btn-ghost btn-sm" type="button" on:click={() => copyText(block.value, block.label)}>
+            <Button variant="ghost" size="sm" type="button" on:click={() => copyText(block.value, block.label)}>
               <Clipboard size={13} />
               <span>{t('copy')}</span>
-            </button>
+            </Button>
           </div>
           <pre><code>{block.value}</code></pre>
         </div>
@@ -268,5 +280,5 @@
 </div>
 
 {#if copyMessage}
-  <div class="toast">{copyMessage}</div>
+  <div class="toast" class:error={copyState === 'error'}>{copyMessage}</div>
 {/if}
