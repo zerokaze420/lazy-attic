@@ -6,7 +6,7 @@
   import { t, locale, toggleLocale } from '$lib/i18n/index.svelte';
   import { Button } from '$lib/components/ui/button';
 
-  $: langLabel = $locale === 'zh' ? 'EN' : '中文';
+  let langLabel = $derived($locale === 'zh' ? 'EN' : '中文');
   let theme = 'dark';
 
   function applyTheme(nextTheme) {
@@ -25,44 +25,40 @@
   onMount(() => {
     try {
       const stored = localStorage.getItem('attic.theme');
-      if (stored === 'light' || stored === 'dark') {
-        applyTheme(stored);
-      }
+      if (stored === 'light' || stored === 'dark') applyTheme(stored);
     } catch {}
   });
 
-  $: if (typeof document !== 'undefined') {
-    document.documentElement.lang = $locale;
-  }
+  $effect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = $locale;
+    }
+  });
 </script>
 
 {#key $locale}
-  <div class="app-shell">
-    <header class="topbar">
-      <div class="topbar-start">
-        <a href="/" class="topbar-logo">
-          <Server size={20} />
+  <div class="flex min-h-screen flex-col">
+    <header class="sticky top-0 z-30 flex h-13 shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-5">
+      <div class="flex items-center gap-5 min-w-0">
+        <a href="/" class="flex shrink-0 items-center gap-2 text-base font-bold text-foreground">
+          <Server size={18} />
           <span>Attic</span>
         </a>
-        <nav class="topbar-nav">
-          <a class="topbar-link" class:active={$page.url.pathname === '/'} href="/">
-            <Database size={16} />
+        <nav class="flex items-center gap-1">
+          <a href="/" class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors {($page.url.pathname === '/') ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}">
+            <Database size={15} />
             <span>{t('sidebar.dash')}</span>
           </a>
-          <a class="topbar-link" class:active={$page.url.pathname === '/guide'} href="/guide">
-            <BookOpen size={16} />
+          <a href="/guide" class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors {($page.url.pathname === '/guide') ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}">
+            <BookOpen size={15} />
             <span>{t('sidebar.guide')}</span>
           </a>
         </nav>
       </div>
-      <div class="topbar-end">
-        <span class="topbar-version">{t('sidebar.footer')}</span>
+      <div class="flex shrink-0 items-center gap-2">
+        <span class="hidden text-xs text-muted-foreground sm:inline">{t('sidebar.footer')}</span>
         <Button variant="ghost" size="icon" onclick={toggleTheme} title="Toggle theme">
-          {#if theme === 'dark'}
-            <Sun size={15} />
-          {:else}
-            <Moon size={15} />
-          {/if}
+          {#if theme === 'dark'}<Sun size={15} />{:else}<Moon size={15} />{/if}
         </Button>
         <Button variant="ghost" size="sm" onclick={toggleLocale} title="Switch language">
           <Globe size={15} />
@@ -70,7 +66,7 @@
         </Button>
       </div>
     </header>
-    <main class="main-content">
+    <main class="flex-1">
       <slot />
     </main>
   </div>
