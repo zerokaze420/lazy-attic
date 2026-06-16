@@ -207,12 +207,12 @@
 </svelte:head>
 
 <div class="page-header">
-  <div style="display:flex;align-items:center;justify-content:space-between;">
-    <div style="display:flex;align-items:center;gap:12px;">
+  <div class="page-header-row">
+    <div class="page-heading-row">
       <a class="btn btn-ghost btn-sm btn-icon" href="/">
         <ArrowLeft size={16} />
       </a>
-      <div>
+      <div class="page-heading">
         <h1 class="page-title">{cacheName || t('cache.title')}</h1>
         <p class="page-description">{cache?.store_dir ?? t('cache.nixStore')}</p>
       </div>
@@ -260,13 +260,13 @@
         <div class="stat-icon"><ExternalLink size={18} /></div>
         <div class="stat-content">
           <span class="stat-label">{t('cache.lastUpload')}</span>
-          <span class="stat-value" style="font-size:0.82rem;">{usage ? formatDate(usage.last_upload_at) : '-'}</span>
+          <span class="stat-value stat-value-sm">{usage ? formatDate(usage.last_upload_at) : '-'}</span>
         </div>
       </div>
     </div>
 
     <!-- Usage stats cards -->
-    <div class="stats-grid" style="margin-top:4px;">
+    <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon"><Activity size={18} /></div>
         <div class="stat-content">
@@ -278,7 +278,7 @@
         <div class="stat-icon"><TrendingUp size={18} /></div>
         <div class="stat-content">
           <span class="stat-label">{t('cache.totalStorage')}</span>
-          <span class="stat-value" style="font-size:1rem;">{usage ? formatBytes(usage.nar_size) : '-'}</span>
+          <span class="stat-value stat-value-md">{usage ? formatBytes(usage.nar_size) : '-'}</span>
         </div>
       </div>
     </div>
@@ -291,7 +291,7 @@
             <h2>{t('cache.usageTrends')}</h2>
             <p>{t('cache.usageTrendsDesc', { period })}</p>
           </div>
-          <BarChart3 size={18} style="color:hsl(var(--muted-foreground));" />
+          <BarChart3 size={18} class="muted-icon" />
         </div>
         <div class="card-body">
           <LineChart series={chartSeries} height={220} />
@@ -309,15 +309,15 @@
           </div>
         </div>
         <div class="card-body">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+          <div class="split-grid">
             {#if systems.length}
               <div>
-                <h3 style="font-size:0.85rem;margin-bottom:10px;font-weight:600;">{t('cache.systemDist')}</h3>
+                <h3 class="section-title">{t('cache.systemDist')}</h3>
                 <div class="breakdown-list">
                   {#each systems as sys}
                     <div class="breakdown-row">
                       <div class="breakdown-row-label">
-                        <span class="badge badge-default" style="font-size:0.72rem;">{sys.name}</span>
+                        <span class="badge badge-default badge-sm">{sys.name}</span>
                       </div>
                       <div class="breakdown-bar-track">
                         <div class="breakdown-bar" style="width:{(sys.count / maxSysCount) * 100}%"></div>
@@ -331,12 +331,12 @@
 
             {#if compressions.length}
               <div>
-                <h3 style="font-size:0.85rem;margin-bottom:10px;font-weight:600;">{t('cache.compressionDist')}</h3>
+                <h3 class="section-title">{t('cache.compressionDist')}</h3>
                 <div class="breakdown-list">
                   {#each compressions as comp}
                     <div class="breakdown-row">
                       <div class="breakdown-row-label">
-                        <span class="badge badge-default" style="font-size:0.72rem;">{comp.name}</span>
+                        <span class="badge badge-default badge-sm">{comp.name}</span>
                       </div>
                       <div class="breakdown-bar-track">
                         <div class="breakdown-bar" style="width:{(comp.count / maxCompCount) * 100}%"></div>
@@ -349,7 +349,7 @@
             {/if}
 
             {#if !systems.length && !compressions.length}
-              <div class="empty" style="grid-column:1/-1;">{t('noMatch')}</div>
+              <div class="empty grid-full">{t('noMatch')}</div>
             {/if}
           </div>
         </div>
@@ -407,7 +407,7 @@
               <textarea class="textarea" bind:value={edit.upstream} rows="3"></textarea>
             </label>
           </div>
-          <div class="form-actions" style="margin-top:16px;">
+          <div class="form-actions mt-md">
             <button class="btn btn-primary" type="button" on:click={saveCache} disabled={busy}>
               <Save size={15} />
               <span>{busy ? t('saving') : t('cache.saveConfig')}</span>
@@ -418,7 +418,7 @@
             </button>
           </div>
           {#if message}
-            <p style="font-size:0.8rem;color:hsl(var(--muted-foreground));margin-top:12px;">{message}</p>
+            <p class="message-text mt-sm">{message}</p>
           {/if}
         {:else}
           <div class="connection-grid">
@@ -438,37 +438,3 @@
 {#if copyMessage}
   <div class="toast">{copyMessage}</div>
 {/if}
-
-<style>
-  .breakdown-list {
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-  }
-  .breakdown-row {
-    display:grid;
-    grid-template-columns:auto 1fr auto;
-    align-items:center;
-    gap:12px;
-  }
-  .breakdown-row-label {
-    min-width:120px;
-  }
-  .breakdown-bar-track {
-    height:10px;
-    background:hsl(var(--muted));
-    border-radius:5px;
-    overflow:hidden;
-  }
-  .breakdown-bar {
-    height:100%;
-    background:linear-gradient(90deg,hsl(var(--primary)),hsl(var(--ring)));
-    border-radius:5px;
-    transition:width .4s ease;
-  }
-  .breakdown-row-value {
-    font-size:0.8rem;
-    color:hsl(var(--muted-foreground));
-    white-space:nowrap;
-  }
-</style>

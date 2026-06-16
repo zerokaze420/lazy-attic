@@ -39,18 +39,3 @@
     <slot />
   </main>
 </div>
-
-<style>
-  .sidebar-footer-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .lang-toggle {
-    height: 28px;
-    padding: 0 8px;
-    font-size: 0.7rem;
-    gap: 4px;
-  }
-</style>

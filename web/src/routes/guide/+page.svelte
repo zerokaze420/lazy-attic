@@ -117,7 +117,7 @@
       <div class="stat-icon"><Terminal size={16} /></div>
       <div class="stat-content">
         <span class="stat-label">{t('guide.cacheEndpoint')}</span>
-        <span class="stat-value" style="font-size:0.78rem;">{endpoint}</span>
+        <span class="stat-value stat-value-sm">{endpoint}</span>
       </div>
     </div>
   </div>
@@ -158,7 +158,7 @@
         </div>
       </div>
       {#each clientBlocks as block}
-        <div class="code-block" style="margin-bottom:10px;">
+        <div class="code-block mb-sm">
           <div class="code-block-header">
             <span>{block.label}</span>
             <button class="btn btn-ghost btn-sm" type="button" on:click={() => copyText(block.value, block.label)}>
@@ -180,7 +180,7 @@
         </div>
       </div>
       {#each pushBlocks as block}
-        <div class="code-block" style="margin-bottom:10px;">
+        <div class="code-block mb-sm">
           <div class="code-block-header">
             <span>{block.label}</span>
             <button class="btn btn-ghost btn-sm" type="button" on:click={() => copyText(block.value, block.label)}>
@@ -202,7 +202,7 @@
         </div>
       </div>
       {#each nixBlocks as block}
-        <div class="code-block" style="margin-bottom:10px;">
+        <div class="code-block mb-sm">
           <div class="code-block-header">
             <span>{block.label}</span>
             <button class="btn btn-ghost btn-sm" type="button" on:click={() => copyText(block.value, block.label)}>
@@ -252,7 +252,7 @@
         </div>
       </div>
       {#each valueBlocks as block}
-        <div class="code-block" style="margin-bottom:10px;">
+        <div class="code-block mb-sm">
           <div class="code-block-header">
             <span>{block.label}</span>
             <button class="btn btn-ghost btn-sm" type="button" on:click={() => copyText(block.value, block.label)}>

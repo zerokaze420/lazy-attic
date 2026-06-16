@@ -197,12 +197,12 @@
 </svelte:head>
 
 <div class="page-header">
-  <div style="display:flex;align-items:center;justify-content:space-between;">
-    <div>
+  <div class="page-header-row">
+    <div class="page-heading">
       <h1 class="page-title">{t('dash.title')}</h1>
       <p class="page-description">{t('dash.description')}</p>
     </div>
-    <div style="display:flex;gap:8px;">
+    <div class="page-actions">
       <a class="btn btn-secondary" href="/guide">
         <BookOpen size={15} />
         <span>{t('sidebar.guide')}</span>
@@ -254,12 +254,12 @@
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 380px;gap:16px;align-items:start;">
-    <div style="display:flex;flex-direction:column;gap:16px;min-width:0;">
+  <div class="dashboard-grid">
+    <div class="stack">
       <div class="card">
         <div class="card-body no-padding">
-          <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid hsl(var(--border));">
-            <div class="search-wrapper" style="flex:1;">
+          <div class="panel-toolbar">
+            <div class="search-wrapper panel-toolbar-main">
               <Search size={15} />
               <input class="input" bind:value={cacheQuery} placeholder={t('dash.searchPlaceholder')} autocomplete="off" />
             </div>
@@ -275,7 +275,7 @@
           </div>
 
           {#if cacheView === 'cards'}
-            <div style="padding:16px;">
+            <div class="panel-body">
               {#if filteredCaches.length}
                 <div class="cache-cards">
                   {#each filteredCaches as cache}
@@ -294,14 +294,14 @@
                         <div class="cache-card-fact"><span>{t('retention')}</span><strong>{formatRetention(cache.retention_period)}</strong></div>
                         <div class="cache-card-fact"><span>{t('created')}</span><strong>{formatDate(cache.created_at)}</strong></div>
                       </div>
-                      <div style="display:flex;flex-direction:column;gap:4px;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;">
-                          <span style="font-size:0.72rem;color:hsl(var(--muted-foreground));">{t('substituter')}</span>
+                      <div class="cache-card-field">
+                        <div class="cache-card-field-head">
+                          <span class="field-label">{t('substituter')}</span>
                           <button class="btn btn-ghost btn-sm btn-icon" on:click={() => copyText(cache.substituter_endpoint, 'Substituter')}>
                             <Clipboard size={13} />
                           </button>
                         </div>
-                        <code class="code-inline" style="display:block;font-size:0.75rem;word-break:break-all;">{cache.substituter_endpoint}</code>
+                        <code class="code-inline block">{cache.substituter_endpoint}</code>
                       </div>
                       <div class="cache-card-actions">
                         <a class="btn btn-primary btn-sm" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
@@ -340,11 +340,11 @@
                 <tbody>
                   {#each filteredCaches as cache}
                     <tr>
-                      <td><strong>{cache.name}</strong><br><span style="font-size:0.75rem;color:hsl(var(--muted-foreground));">{cache.store_dir}</span></td>
+                      <td><strong>{cache.name}</strong><br><span class="meta-text">{cache.store_dir}</span></td>
                       <td><span class="badge" class:badge-success={cache.is_public} class:badge-warning={!cache.is_public}>{cache.is_public ? t('public') : t('private')}</span></td>
                       <td>{cache.objects}</td>
                       <td>{formatRetention(cache.retention_period)}</td>
-                      <td><code class="code-inline" style="font-size:0.72rem;max-width:280px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{cache.substituter_endpoint}</code></td>
+                      <td><code class="code-inline truncate">{cache.substituter_endpoint}</code></td>
                       <td>
                         <a class="btn btn-ghost btn-sm btn-icon" href={`/cache?name=${encodeURIComponent(cache.name)}`}>
                           <ExternalLink size={14} />
@@ -381,10 +381,10 @@
         </div>
         <div class="card-body no-padding">
           {#each activeCommands as command}
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid hsl(var(--border));">
-              <div style="min-width:0;flex:1;">
-                <span style="font-size:0.72rem;font-weight:600;color:hsl(var(--muted-foreground));">{command.label}</span>
-                <code style="display:block;font-family:monospace;font-size:0.78rem;color:hsl(var(--foreground));margin-top:2px;word-break:break-all;">{command.value}</code>
+            <div class="command-row">
+              <div class="command-body">
+                <span class="field-label">{command.label}</span>
+                <code>{command.value}</code>
               </div>
               <button class="btn btn-ghost btn-sm btn-icon" title={`${t('copy')} ${command.label}`} on:click={() => copyText(command.value, command.label)}>
                 <Clipboard size={13} />
@@ -395,14 +395,14 @@
       </div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:16px;">
+    <div class="stack">
       <div class="card">
         <div class="card-header">
           <div>
             <h2>{t('storage')}</h2>
             <p>{t('storageDesc') || '后端类型：' + (summary?.storage?.kind === 's3' ? 'S3' : 'Local')}</p>
           </div>
-          <Database size={18} style="color:hsl(var(--muted-foreground));" />
+          <Database size={18} class="muted-icon" />
         </div>
         <div class="card-body">
           <div class="tabs">
@@ -410,18 +410,18 @@
             <button class="tab" class:active={storageTab === 's3'} on:click={() => storageTab = 's3'}>S3</button>
           </div>
           {#if storageTab === 'current'}
-            <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
-              <div style="padding:10px;border:1px solid hsl(var(--border));border-radius:var(--radius);background:hsl(var(--muted)/.3);">
-                <span style="font-size:0.75rem;color:hsl(var(--muted-foreground));">{t('dash.storageKind') || '后端类型'}</span>
-                <strong style="font-size:0.85rem;display:block;">{summary?.storage?.kind === 's3' ? 'S3' : 'Local'}</strong>
+            <div class="stack stack-sm mt-sm">
+              <div class="surface">
+                <span class="meta-text">{t('dash.storageKind') || '后端类型'}</span>
+                <strong>{summary?.storage?.kind === 's3' ? 'S3' : 'Local'}</strong>
               </div>
-              <div style="padding:10px;border:1px solid hsl(var(--border));border-radius:var(--radius);background:hsl(var(--muted)/.3);">
-                <span style="font-size:0.75rem;color:hsl(var(--muted-foreground));">{summary?.storage?.kind === 's3' ? 'Bucket' : '路径'}</span>
-                <strong style="font-size:0.85rem;display:block;word-break:break-all;">{summary?.storage?.location || '-'}</strong>
+              <div class="surface">
+                <span class="meta-text">{summary?.storage?.kind === 's3' ? 'Bucket' : '路径'}</span>
+                <strong>{summary?.storage?.location || '-'}</strong>
               </div>
             </div>
           {:else}
-            <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+            <div class="stack stack-sm mt-sm">
               <label class="label">
                 <span>Region</span>
                 <input class="input" bind:value={s3Form.region} placeholder="us-east-1" />
@@ -431,7 +431,7 @@
                 <input class="input" bind:value={s3Form.bucket} placeholder="attic-cache" />
               </label>
               <label class="label">
-                <span>Endpoint <span style="font-weight:400;color:hsl(var(--muted-foreground));">（MinIO / R2 等填此项）</span></span>
+                <span>Endpoint <span class="meta-text">（MinIO / R2 等填此项）</span></span>
                 <input class="input" bind:value={s3Form.endpoint} placeholder="https://s3.amazonaws.com" />
               </label>
               <label class="label">
@@ -442,11 +442,11 @@
                 <span>Secret Access Key</span>
                 <input class="input" bind:value={s3Form.secret_access_key} type="password" placeholder="可选，留空则读取环境变量" />
               </label>
-              <button class="btn btn-primary" on:click={saveStorageConfig} disabled={storageBusy} style="width:100%;">
+              <button class="btn btn-primary full-width-button" on:click={saveStorageConfig} disabled={storageBusy}>
                 <span>{storageBusy ? '保存中' : '保存 S3 配置'}</span>
               </button>
               {#if storageMessage}
-                <p style="font-size:0.78rem;color:hsl(var(--muted-foreground));">{storageMessage}</p>
+                <p class="message-text">{storageMessage}</p>
               {/if}
             </div>
           {/if}
@@ -459,14 +459,14 @@
             <h2>{t('dash.adminToken')}</h2>
             <p>{t('dash.adminTokenDesc')}</p>
           </div>
-          <KeyRound size={18} style="color:hsl(var(--muted-foreground));" />
+          <KeyRound size={18} class="muted-icon" />
         </div>
         <div class="card-body">
-          <code style="display:block;padding:8px 10px;border-radius:var(--radius);background:hsl(var(--muted));font-family:monospace;font-size:0.75rem;word-break:break-all;line-height:1.5;color:hsl(var(--foreground));">{token || t('waitServer')}</code>
+          <code class="code-token">{token || t('waitServer')}</code>
           {#if adminTokenExpires}
-            <p style="font-size:0.75rem;color:hsl(var(--muted-foreground));margin-top:8px;">{t('dash.expiresAt')} {formatDate(adminTokenExpires)}</p>
+            <p class="meta-text mt-xs">{t('dash.expiresAt')} {formatDate(adminTokenExpires)}</p>
           {/if}
-          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px;">
+          <div class="token-actions">
             <button class="btn btn-primary" on:click={issueAdminToken} disabled={tokenBusy}>
               <Sparkles size={15} />
               <span>{tokenBusy ? t('dash.regenerating') : t('dash.regenerate')}</span>
@@ -484,10 +484,10 @@
             <h2>{t('dash.createCache')}</h2>
             <p>{t('dash.createCacheDesc')}</p>
           </div>
-          <Plus size={18} style="color:hsl(var(--muted-foreground));" />
+          <Plus size={18} class="muted-icon" />
         </div>
         <div class="card-body">
-          <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="stack stack-sm">
             <label class="label">
               <span>{t('dash.name')}</span>
               <input class="input" bind:value={create.name} placeholder="main" autocomplete="off" />
@@ -501,17 +501,17 @@
                 <span>{t('dash.priority')}</span>
                 <input class="input" bind:value={create.priority} type="number" />
               </label>
-              <label class="checkbox-label" style="align-self:end;height:36px;">
+              <label class="checkbox-label inline-checkbox">
                 <input bind:checked={create.isPublic} type="checkbox" />
                 <span>{t('dash.isPublic')}</span>
               </label>
             </div>
-            <button class="btn btn-primary" on:click={createCache} disabled={createBusy} style="width:100%;">
+            <button class="btn btn-primary full-width-button" on:click={createCache} disabled={createBusy}>
               <Plus size={15} />
               <span>{createBusy ? t('dash.creating') : t('dash.create')}</span>
             </button>
             {#if createMessage}
-              <p style="font-size:0.78rem;color:hsl(var(--muted-foreground));">{createMessage}</p>
+              <p class="message-text">{createMessage}</p>
             {/if}
           </div>
         </div>
