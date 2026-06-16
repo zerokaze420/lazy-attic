@@ -8,6 +8,6 @@
   };
 </script>
 
-<div class={cn('inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.02]', variants[variant], className)} {...rest}>
+<div class={cn('inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium', variants[variant], className)} {...rest}>
   {@render children?.()}
 </div>

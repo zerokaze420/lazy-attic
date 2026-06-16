@@ -6,6 +6,6 @@
 <input
   type="checkbox"
   checked={checked}
-  class={cn('size-4 rounded border border-input bg-background text-primary outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring/40', className)}
+  class={cn('size-4 rounded border border-input bg-background text-primary outline-none transition-[background,border-color] duration-200 focus-visible:ring-2 focus-visible:ring-ring/40', className)}
   {...rest}
 />

@@ -4,6 +4,6 @@
 </script>
 
 <textarea
-  class={cn('flex min-h-24 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[0.95rem] text-foreground outline-none backdrop-blur-md transition-all duration-300 placeholder:text-muted-foreground focus:border-violet-400/40 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/20 disabled:cursor-not-allowed disabled:opacity-50', className)}
+   class={cn('flex min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-[background,border-color,color,opacity] duration-200 placeholder:text-muted-foreground focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50', className)}
   {...rest}
 ></textarea>

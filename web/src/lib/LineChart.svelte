@@ -44,6 +44,22 @@
       .join(' ');
   }
 
+  function buildAreaPath(s) {
+    if (s.points.length === 0) return '';
+    const top = MARGIN.top + INNER_H;
+    let d = s.points
+      .map((p, i) => {
+        const x = px(i, s.points.length);
+        const y = py(p.y);
+        return i === 0 ? `M${x},${y}` : `L${x},${y}`;
+      })
+      .join(' ');
+    const last = s.points.length - 1;
+    d += ` L${px(last, s.points.length)},${top}`;
+    d += ` L${px(0, s.points.length)},${top} Z`;
+    return d;
+  }
+
   function handleMouseMove(e) {
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
@@ -55,7 +71,6 @@
       return;
     }
 
-    // Find closest point across all series
     let bestSeriesIdx = 0;
     let bestPointIdx = 0;
     let bestDist = Infinity;
@@ -92,9 +107,21 @@
     preserveAspectRatio="xMidYMid meet"
     role="img"
     aria-label="Line chart"
+    text-rendering="geometricPrecision"
+    style="font-family:var(--font-body)"
     onmousemove={handleMouseMove}
     onmouseleave={handleMouseLeave}
   >
+    <defs>
+      {#each series as s, si}
+        {@const id = `grad-${si}`}
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color={s.color} stop-opacity="0.3" />
+          <stop offset="100%" stop-color={s.color} stop-opacity="0" />
+        </linearGradient>
+      {/each}
+    </defs>
+
     <!-- Grid lines -->
     {#each gridLines as val}
       <line
@@ -104,6 +131,7 @@
         y2={py(val)}
         stroke="hsl(var(--border))"
         stroke-width="1"
+        stroke-dasharray="4,4"
       />
       <text
         x={MARGIN.left - 8}
@@ -125,11 +153,19 @@
             y={CHART_H - 6}
             text-anchor="middle"
             fill="hsl(var(--muted-foreground))"
-            font-size="10"
+            font-size="11"
           >{p.x.slice(5)}</text>
         {/if}
       {/each}
     {/if}
+
+    <!-- Area fills -->
+    {#each series as s, si}
+      <path
+        d={buildAreaPath(s)}
+        fill={`url(#grad-${si})`}
+      />
+    {/each}
 
     <!-- Lines -->
     {#each series as s, si}
@@ -209,8 +245,8 @@
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
     padding: 8px 12px;
-    font-size: 0.75rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    font-size: 0.8rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     z-index: 10;
     min-width: 120px;
   }
@@ -218,7 +254,7 @@
     font-weight: 600;
     color: hsl(var(--foreground));
     margin-bottom: 4px;
-    font-size: 0.78rem;
+    font-size: 0.85rem;
   }
   .chart-tooltip-series {
     display: flex;

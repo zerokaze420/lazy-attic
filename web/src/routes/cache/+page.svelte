@@ -212,8 +212,8 @@
   ] : [];
 
   // Distribution data for simplified bars
-  $: systems = usage?.systems ?? [];
-  $: compressions = usage?.compressions ?? [];
+  $: systems = (usage?.systems ?? []).filter(s => s.name !== 'unknown');
+  $: compressions = (usage?.compressions ?? []).filter(c => c.name !== 'unknown');
   $: maxSysCount = systems.length ? Math.max(...systems.map(s => s.count)) : 1;
   $: maxCompCount = compressions.length ? Math.max(...compressions.map(c => c.count)) : 1;
 </script>
@@ -249,7 +249,6 @@
   {/if}
 
   {#if cache}
-    <!-- Overview Stats -->
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon"><Box size={18} /></div>
@@ -273,17 +272,6 @@
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon"><ExternalLink size={18} /></div>
-        <div class="stat-content">
-          <span class="stat-label">{t('cache.lastUpload')}</span>
-          <span class="stat-value stat-value-sm">{usage ? formatDate(usage.last_upload_at) : '-'}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Usage stats cards -->
-    <div class="stats-grid">
-      <div class="stat-card">
         <div class="stat-icon"><Activity size={18} /></div>
         <div class="stat-content">
           <span class="stat-label">{t('cache.totalAccesses')}</span>
@@ -294,7 +282,14 @@
         <div class="stat-icon"><TrendingUp size={18} /></div>
         <div class="stat-content">
           <span class="stat-label">{t('cache.totalStorage')}</span>
-          <span class="stat-value stat-value-md">{usage ? formatBytes(usage.nar_size) : '-'}</span>
+          <span class="stat-value">{usage ? formatBytes(usage.nar_size) : '-'}</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><ExternalLink size={18} /></div>
+        <div class="stat-content">
+          <span class="stat-label">{t('cache.lastUpload')}</span>
+          <span class="stat-value">{usage ? formatDate(usage.last_upload_at) : '-'}</span>
         </div>
       </div>
     </div>

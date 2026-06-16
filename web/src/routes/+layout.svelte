@@ -2,7 +2,7 @@
   import '../app.css';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  import { Database, Globe, Moon, Server, Sun } from '@lucide/svelte';
+  import { BookOpen, Database, Globe, Moon, Server, Sun } from '@lucide/svelte';
   import { t, locale, toggleLocale } from '$lib/i18n/index.svelte';
   import { Button } from '$lib/components/ui/button';
 
@@ -13,12 +13,9 @@
     theme = nextTheme;
     if (typeof document !== 'undefined') {
       document.documentElement.dataset.theme = nextTheme;
-      document.documentElement.classList.toggle('dark', nextTheme === 'dark');
       document.documentElement.lang = $locale;
     }
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('attic.theme', nextTheme);
-    }
+    try { localStorage.setItem('attic.theme', nextTheme); } catch {}
   }
 
   function toggleTheme() {
@@ -26,8 +23,12 @@
   }
 
   onMount(() => {
-    const stored = localStorage.getItem('attic.theme');
-    applyTheme(stored === 'light' || stored === 'dark' ? stored : 'dark');
+    try {
+      const stored = localStorage.getItem('attic.theme');
+      if (stored === 'light' || stored === 'dark') {
+        applyTheme(stored);
+      }
+    } catch {}
   });
 
   $: if (typeof document !== 'undefined') {
@@ -37,38 +38,38 @@
 
 {#key $locale}
   <div class="app-shell">
-    <nav class="sidebar">
-      <div class="sidebar-header">
-        <div class="logo">
+    <header class="topbar">
+      <div class="topbar-start">
+        <a href="/" class="topbar-logo">
           <Server size={20} />
           <span>Attic</span>
-        </div>
-      </div>
-      <div class="sidebar-nav">
-        <a class="nav-item" class:active={$page.url.pathname === '/'} href="/">
-          <Database size={16} />
-          <span>{t('sidebar.dash')}</span>
         </a>
+        <nav class="topbar-nav">
+          <a class="topbar-link" class:active={$page.url.pathname === '/'} href="/">
+            <Database size={16} />
+            <span>{t('sidebar.dash')}</span>
+          </a>
+          <a class="topbar-link" class:active={$page.url.pathname === '/guide'} href="/guide">
+            <BookOpen size={16} />
+            <span>{t('sidebar.guide')}</span>
+          </a>
+        </nav>
       </div>
-      <div class="sidebar-footer">
-        <div class="sidebar-footer-row">
-          <p>{t('sidebar.footer')}</p>
-          <div class="sidebar-actions">
-            <Button variant="ghost" size="icon" class="sidebar-action-button" onclick={toggleTheme} title="Toggle theme">
-              {#if theme === 'dark'}
-                <Sun size={14} />
-              {:else}
-                <Moon size={14} />
-              {/if}
-            </Button>
-            <Button variant="ghost" size="sm" class="lang-toggle" onclick={toggleLocale} title="Switch language">
-              <Globe size={14} />
-              <span>{langLabel}</span>
-            </Button>
-          </div>
-        </div>
+      <div class="topbar-end">
+        <span class="topbar-version">{t('sidebar.footer')}</span>
+        <Button variant="ghost" size="icon" onclick={toggleTheme} title="Toggle theme">
+          {#if theme === 'dark'}
+            <Sun size={15} />
+          {:else}
+            <Moon size={15} />
+          {/if}
+        </Button>
+        <Button variant="ghost" size="sm" onclick={toggleLocale} title="Switch language">
+          <Globe size={15} />
+          <span>{langLabel}</span>
+        </Button>
       </div>
-    </nav>
+    </header>
     <main class="main-content">
       <slot />
     </main>

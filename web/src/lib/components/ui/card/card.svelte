@@ -5,7 +5,7 @@
 
   <div
   class={cn(
-    'rounded-3xl border border-white/10 bg-white/5 text-card-foreground shadow-sm backdrop-blur-md animate-slide-up transition-all duration-300 hover:border-white/15 hover:bg-white/[0.07]',
+    'rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-[background,border-color] duration-200',
     className
   )}
   {...rest}

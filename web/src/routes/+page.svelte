@@ -270,7 +270,7 @@
           <div class="panel-toolbar">
             <div class="search-wrapper panel-toolbar-main">
               <Search size={15} />
-              <Input bind:value={cacheQuery} placeholder={t('dash.searchPlaceholder')} autocomplete="off" />
+              <Input bind:value={cacheQuery} placeholder={t('dash.searchPlaceholder')} autocomplete="off" class="pl-9 min-w-0" />
             </div>
             <div class="tabs">
               <button class="tab" class:active={cacheVisibility === 'all'} on:click={() => cacheVisibility = 'all'}>{t('all')}</button>
