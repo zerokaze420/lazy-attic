@@ -28,6 +28,7 @@ mod storage;
 
 use std::future::IntoFuture;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -61,6 +62,9 @@ type RequestState = Arc<RequestStateInner>;
 pub struct StateInner {
     /// The Attic Server configuration.
     config: Config,
+
+    /// Path to the configuration file (if known).
+    config_path: Option<PathBuf>,
 
     /// Handle to the database.
     database: OnceCell<DatabaseConnection>,
@@ -98,9 +102,10 @@ struct RequestStateInner {
 }
 
 impl StateInner {
-    async fn new(config: Config) -> State {
+    async fn new(config: Config, config_path: Option<PathBuf>) -> State {
         Arc::new(Self {
             config,
+            config_path,
             database: OnceCell::new(),
             storage: OnceCell::new(),
             console_admin_token: Mutex::new(None),
@@ -221,10 +226,10 @@ async fn fallback(_: Uri) -> ServerResult<()> {
 }
 
 /// Runs the API server.
-pub async fn run_api_server(cli_listen: Option<SocketAddr>, config: Config) -> Result<()> {
+pub async fn run_api_server(cli_listen: Option<SocketAddr>, config: Config, config_path: Option<PathBuf>) -> Result<()> {
     eprintln!("Starting API server...");
 
-    let state = StateInner::new(config).await;
+    let state = StateInner::new(config, config_path).await;
 
     let listen = if let Some(cli_listen) = cli_listen {
         cli_listen
@@ -263,7 +268,7 @@ pub async fn run_api_server(cli_listen: Option<SocketAddr>, config: Config) -> R
 pub async fn run_migrations(config: Config) -> Result<()> {
     eprintln!("Running migrations...");
 
-    let state = StateInner::new(config).await;
+    let state = StateInner::new(config, None).await;
     let db = state.database().await?;
     Migrator::up(db, None).await?;
 

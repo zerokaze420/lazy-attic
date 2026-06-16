@@ -74,14 +74,14 @@ async fn main() -> Result<()> {
             attic_server::run_migrations(config.clone()).await?;
 
             let (api_server, _) = join!(
-                attic_server::run_api_server(opts.listen, config.clone()),
+                attic_server::run_api_server(opts.listen, config.clone(), opts.config.clone()),
                 attic_server::gc::run_garbage_collection(config.clone()),
             );
 
             api_server?;
         }
         ServerMode::ApiServer => {
-            attic_server::run_api_server(opts.listen, config).await?;
+            attic_server::run_api_server(opts.listen, config, opts.config).await?;
         }
         ServerMode::GarbageCollector => {
             attic_server::gc::run_garbage_collection(config.clone()).await;

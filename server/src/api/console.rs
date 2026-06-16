@@ -25,6 +25,31 @@ use crate::database::entity::{
 use crate::error::{ErrorKind, ServerError, ServerResult};
 use crate::{RequestState, State};
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct StorageConfigUpdate {
+    region: Option<String>,
+    bucket: Option<String>,
+    endpoint: Option<String>,
+    access_key_id: Option<String>,
+    secret_access_key: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct StorageConfigResponse {
+    kind: String,
+    region: Option<String>,
+    bucket: Option<String>,
+    endpoint: Option<String>,
+    access_key_id: Option<String>,
+    secret_access_key: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct StorageUpdateResult {
+    success: bool,
+    message: String,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct ConsoleSummary {
     status: &'static str,
@@ -768,4 +793,98 @@ fn console_object(cache: &ConsoleCache, object: object::Model, nar: NarModel) ->
             created_at: nar.created_at.to_rfc3339(),
         },
     }
+}
+
+pub(crate) async fn get_storage_config(
+    Extension(state): Extension<State>,
+) -> ServerResult<Json<StorageConfigResponse>> {
+    match &state.config.storage {
+        StorageConfig::Local(_) => Ok(Json(StorageConfigResponse {
+            kind: "local".to_string(),
+            region: None,
+            bucket: None,
+            endpoint: None,
+            access_key_id: None,
+            secret_access_key: None,
+        })),
+        StorageConfig::S3(s3) => Ok(Json(StorageConfigResponse {
+            kind: "s3".to_string(),
+            region: Some(s3.region.clone()),
+            bucket: Some(s3.bucket.clone()),
+            endpoint: s3.endpoint.clone(),
+            access_key_id: s3.credentials.as_ref().map(|c| c.access_key_id.clone()),
+            secret_access_key: s3.credentials.as_ref().map(|c| c.secret_access_key.clone()),
+        })),
+    }
+}
+
+pub(crate) async fn update_storage_config(
+    Extension(state): Extension<State>,
+    Json(update): Json<StorageConfigUpdate>,
+) -> ServerResult<Json<StorageUpdateResult>> {
+    let config_path = state.config_path.as_ref().ok_or_else(|| {
+        ErrorKind::RequestError(anyhow::anyhow!(
+            "配置文件路径未知，无法保存。请通过 -f 参数指定配置文件路径后重启。"
+        ))
+    })?;
+
+    let region = update.region.unwrap_or_default();
+    let bucket = update.bucket.unwrap_or_default();
+
+    if region.is_empty() || bucket.is_empty() {
+        return Ok(Json(StorageUpdateResult {
+            success: false,
+            message: "Region 和 Bucket 为必填项。".to_string(),
+        }));
+    }
+
+    let config_str = std::fs::read_to_string(config_path).map_err(|e| {
+        ErrorKind::RequestError(anyhow::anyhow!("无法读取配置文件: {}", e))
+    })?;
+
+    let mut doc: toml::Value = toml::from_str(&config_str).map_err(|e| {
+        ErrorKind::RequestError(anyhow::anyhow!("配置文件解析失败: {}", e))
+    })?;
+
+    let mut storage = toml::map::Map::new();
+    storage.insert("type".to_string(), toml::Value::String("s3".to_string()));
+    storage.insert("region".to_string(), toml::Value::String(region));
+    storage.insert("bucket".to_string(), toml::Value::String(bucket));
+
+    if let Some(endpoint) = update.endpoint.filter(|s| !s.is_empty()) {
+        storage.insert("endpoint".to_string(), toml::Value::String(endpoint));
+    }
+
+    if update.access_key_id.is_some() || update.secret_access_key.is_some() {
+        let mut creds = toml::map::Map::new();
+        if let Some(akid) = update.access_key_id.filter(|s| !s.is_empty()) {
+            creds.insert("access_key_id".to_string(), toml::Value::String(akid));
+        }
+        if let Some(secret) = update.secret_access_key.filter(|s| !s.is_empty()) {
+            creds.insert(
+                "secret_access_key".to_string(),
+                toml::Value::String(secret),
+            );
+        }
+        storage.insert("credentials".to_string(), toml::Value::Table(creds));
+    }
+
+    doc.as_table_mut()
+        .ok_or_else(|| {
+            ErrorKind::RequestError(anyhow::anyhow!("配置文件格式异常。"))
+        })?
+        .insert("storage".to_string(), toml::Value::Table(storage));
+
+    let new_config_str = toml::to_string_pretty(&doc).map_err(|e| {
+        ErrorKind::RequestError(anyhow::anyhow!("配置文件序列化失败: {}", e))
+    })?;
+
+    std::fs::write(config_path, new_config_str).map_err(|e| {
+        ErrorKind::RequestError(anyhow::anyhow!("无法写入配置文件: {}", e))
+    })?;
+
+    Ok(Json(StorageUpdateResult {
+        success: true,
+        message: "S3 存储配置已保存到配置文件。重启 atticd 后生效。".to_string(),
+    }))
 }

@@ -44,23 +44,23 @@ pub struct S3StorageConfig {
     /// Custom S3 endpoint.
     ///
     /// Set this if you are using an S3-compatible object storage (e.g., Minio).
-    endpoint: Option<String>,
+    pub(crate) endpoint: Option<String>,
 
     /// S3 credentials.
     ///
     /// If not specified, it's read from the `AWS_ACCESS_KEY_ID` and
     /// `AWS_SECRET_ACCESS_KEY` environment variables.
-    credentials: Option<S3CredentialsConfig>,
+    pub(crate) credentials: Option<S3CredentialsConfig>,
 }
 
 /// S3 credential configuration.
 #[derive(Debug, Clone, Deserialize)]
 pub struct S3CredentialsConfig {
     /// Access key ID.
-    access_key_id: String,
+    pub(crate) access_key_id: String,
 
     /// Secret access key.
-    secret_access_key: String,
+    pub(crate) secret_access_key: String,
 }
 
 /// Reference to a file in an S3-compatible storage bucket.

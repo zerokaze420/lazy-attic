@@ -43,6 +43,10 @@
   let cacheVisibility = 'all';
   let cacheView = 'cards';
   let commandTab = 'client';
+  let storageTab = 'current';
+  let s3Form = { region: 'us-east-1', bucket: '', endpoint: '', access_key_id: '', secret_access_key: '' };
+  let storageBusy = false;
+  let storageMessage = '';
 
   onMount(() => {
     origin = location.origin;
@@ -125,6 +129,26 @@
       createMessage = err instanceof Error ? err.message : String(err);
     } finally {
       createBusy = false;
+    }
+  }
+
+  async function saveStorageConfig() {
+    storageBusy = true;
+    storageMessage = '';
+    try {
+      const response = await fetch('/_api/web/storage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(s3Form)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || `HTTP ${response.status}`);
+      storageMessage = result.message;
+      await refresh();
+    } catch (err) {
+      storageMessage = err instanceof Error ? err.message : String(err);
+    } finally {
+      storageBusy = false;
     }
   }
 
@@ -372,6 +396,63 @@
     </div>
 
     <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>{t('storage')}</h2>
+            <p>{t('storageDesc') || '后端类型：' + (summary?.storage?.kind === 's3' ? 'S3' : 'Local')}</p>
+          </div>
+          <Database size={18} style="color:hsl(var(--muted-foreground));" />
+        </div>
+        <div class="card-body">
+          <div class="tabs">
+            <button class="tab" class:active={storageTab === 'current'} on:click={() => storageTab = 'current'}>{t('dash.current') || '当前'}</button>
+            <button class="tab" class:active={storageTab === 's3'} on:click={() => storageTab = 's3'}>S3</button>
+          </div>
+          {#if storageTab === 'current'}
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+              <div style="padding:10px;border:1px solid hsl(var(--border));border-radius:var(--radius);background:hsl(var(--muted)/.3);">
+                <span style="font-size:0.75rem;color:hsl(var(--muted-foreground));">{t('dash.storageKind') || '后端类型'}</span>
+                <strong style="font-size:0.85rem;display:block;">{summary?.storage?.kind === 's3' ? 'S3' : 'Local'}</strong>
+              </div>
+              <div style="padding:10px;border:1px solid hsl(var(--border));border-radius:var(--radius);background:hsl(var(--muted)/.3);">
+                <span style="font-size:0.75rem;color:hsl(var(--muted-foreground));">{summary?.storage?.kind === 's3' ? 'Bucket' : '路径'}</span>
+                <strong style="font-size:0.85rem;display:block;word-break:break-all;">{summary?.storage?.location || '-'}</strong>
+              </div>
+            </div>
+          {:else}
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+              <label class="label">
+                <span>Region</span>
+                <input class="input" bind:value={s3Form.region} placeholder="us-east-1" />
+              </label>
+              <label class="label">
+                <span>Bucket</span>
+                <input class="input" bind:value={s3Form.bucket} placeholder="attic-cache" />
+              </label>
+              <label class="label">
+                <span>Endpoint <span style="font-weight:400;color:hsl(var(--muted-foreground));">（MinIO / R2 等填此项）</span></span>
+                <input class="input" bind:value={s3Form.endpoint} placeholder="https://s3.amazonaws.com" />
+              </label>
+              <label class="label">
+                <span>Access Key ID</span>
+                <input class="input" bind:value={s3Form.access_key_id} placeholder="可选，留空则读取环境变量" />
+              </label>
+              <label class="label">
+                <span>Secret Access Key</span>
+                <input class="input" bind:value={s3Form.secret_access_key} type="password" placeholder="可选，留空则读取环境变量" />
+              </label>
+              <button class="btn btn-primary" on:click={saveStorageConfig} disabled={storageBusy} style="width:100%;">
+                <span>{storageBusy ? '保存中' : '保存 S3 配置'}</span>
+              </button>
+              {#if storageMessage}
+                <p style="font-size:0.78rem;color:hsl(var(--muted-foreground));">{storageMessage}</p>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <div>

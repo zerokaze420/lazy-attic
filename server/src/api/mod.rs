@@ -44,6 +44,10 @@ pub(crate) fn get_router() -> Router {
         .route(
             "/_api/web/caches/:cache/config",
             patch(v1::cache_config::configure_cache).delete(v1::cache_config::destroy_cache),
+        )
+        .route(
+            "/_api/web/storage",
+            get(console::get_storage_config).post(console::update_storage_config),
         );
 
     if let Some(web_dir) = web_dir() {
